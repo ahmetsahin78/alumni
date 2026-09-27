@@ -1,0 +1,214 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  STUDENT
+  ALUMNI
+  ADMIN
+}
+
+enum MentorshipStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COMPLETED
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  INTERNSHIP
+  REMOTE
+  CONTRACT
+}
+
+enum RSVPStatus {
+  ATTENDING
+  MAYBE
+  DECLINED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(STUDENT)
+  isVerified   Boolean  @default(false)
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  profile              Profile?
+  academicHistories    AcademicHistory[]
+  workExperiences      WorkExperience[]
+  skills               UserSkill[]
+  mentorshipsAsMentor  MentorshipRequest[] @relation("MentorRequests")
+  mentorshipsAsMentee  MentorshipRequest[] @relation("MenteeRequests")
+  jobPostings          JobPosting[]
+  eventsOrganized      Event[]             @relation("OrganizedEvents")
+  eventRSVPs           EventRSVP[]
+
+  @@map("users")
+}
+
+model Profile {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  firstName        String
+  lastName         String
+  headline         String?
+  bio              String?
+  phone            String?
+  location         String?
+  linkedinUrl      String?
+  githubUrl        String?
+  websiteUrl       String?
+  isMentor         Boolean  @default(false)
+  mentorshipTopics String?  // comma-separated or JSON
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+model AcademicHistory {
+  id             String   @id @default(uuid())
+  userId         String
+  university     String   @default("Istanbul University")
+  faculty        String
+  department     String
+  degree         String   @default("Bachelor")
+  startYear      Int
+  graduationYear Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([graduationYear])
+  @@index([department])
+  @@map("academic_histories")
+}
+
+model WorkExperience {
+  id          String    @id @default(uuid())
+  userId      String
+  company     String
+  position    String
+  industry    String
+  location    String?
+  startDate   DateTime
+  endDate     DateTime?
+  isCurrent   Boolean   @default(false)
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([industry])
+  @@index([company])
+  @@map("work_experiences")
+}
+
+model Skill {
+  id    String      @id @default(uuid())
+  name  String      @unique
+  users UserSkill[]
+
+  @@map("skills")
+}
+
+model UserSkill {
+  id        String   @id @default(uuid())
+  userId    String
+  skillId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skillId])
+  @@map("user_skills")
+}
+
+model MentorshipRequest {
+  id         String           @id @default(uuid())
+  mentorId   String
+  menteeId   String
+  status     MentorshipStatus @default(PENDING)
+  message    String
+  meetingUrl String?
+  notes      String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  mentor User @relation("MentorRequests", fields: [mentorId], references: [id], onDelete: Cascade)
+  mentee User @relation("MenteeRequests", fields: [menteeId], references: [id], onDelete: Cascade)
+
+  @@map("mentorship_requests")
+}
+
+model JobPosting {
+  id             String   @id @default(uuid())
+  authorId       String
+  title          String
+  company        String
+  location       String
+  type           JobType  @default(FULL_TIME)
+  industry       String?
+  description    String
+  requirements   String?
+  applicationUrl String?
+  salaryRange    String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([industry])
+  @@index([type])
+  @@map("job_postings")
+}
+
+model Event {
+  id           String      @id @default(uuid())
+  organizerId  String
+  title        String
+  description  String
+  location     String
+  eventDate    DateTime
+  isOnline     Boolean     @default(false)
+  meetingUrl   String?
+  maxAttendees Int?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  organizer User        @relation("OrganizedEvents", fields: [organizerId], references: [id], onDelete: Cascade)
+  rsvps     EventRSVP[]
+
+  @@map("events")
+}
+
+model EventRSVP {
+  id        String     @id @default(uuid())
+  eventId   String
+  userId    String
+  status    RSVPStatus @default(ATTENDING)
+  createdAt DateTime   @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_rsvps")
+}
