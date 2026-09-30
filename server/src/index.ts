@@ -1,4 +1,5 @@
 import express, { Request, Response } from "express";
+import path from "path";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -13,17 +14,19 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5001;
+const publicDir = path.join(__dirname, "../public");
 
 // Global Middlewares
 app.use(
   helmet({
-    contentSecurityPolicy: false, // Allows Swagger UI to execute scripts and styles smoothly
+    contentSecurityPolicy: false, // Allows Swagger UI and local HTML to execute smoothly
   })
 );
 app.use(cors());
 app.use(morgan(process.env.NODE_ENV === "development" ? "dev" : "combined"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static(publicDir));
 
 // Swagger UI - available at /api/swagger and /api-docs as requested
 const swaggerOptions: swaggerUi.SwaggerOptions = {
@@ -45,6 +48,32 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerOption
 app.get("/api/swagger.json", (req: Request, res: Response) => {
   res.setHeader("Content-Type", "application/json");
   res.json(swaggerSpec);
+});
+
+// GET / -> Root page (Serves index.html or helpful JSON)
+app.get("/", (req: Request, res: Response) => {
+  if (req.accepts("html")) {
+    res.sendFile(path.join(publicDir, "index.html"));
+  } else {
+    res.json({
+      name: "Alumni Tracking System API",
+      status: "running",
+      documentation: "/api/swagger",
+      healthCheck: "/api/health",
+      alumniApi: "/api/alumni",
+      usersApi: "/api/users",
+    });
+  }
+});
+
+// GET /about -> About page from course
+app.get("/about", (req: Request, res: Response) => {
+  res.sendFile(path.join(publicDir, "about.html"));
+});
+
+// GET /alumni -> Redirect to /api/alumni
+app.get("/alumni", (req: Request, res: Response) => {
+  res.redirect("/api/alumni");
 });
 
 // Root Utility Routes (/hello/:name, /sum/:number1/:number2)
@@ -74,7 +103,7 @@ if (process.env.NODE_ENV !== "test") {
   app.listen(PORT, () => {
     console.log(`\n======================================================`);
     console.log(`🚀 Alumni Tracking Server is active!`);
-    console.log(`📡 URL: http://localhost:${PORT}`);
+    console.log(`📡 Root URL:    http://localhost:${PORT}/`);
     console.log(`📋 Health Check: http://localhost:${PORT}/api/health`);
     console.log(`🎓 Alumni API:  http://localhost:${PORT}/api/alumni`);
     console.log(`👤 Users API:   http://localhost:${PORT}/api/users`);
