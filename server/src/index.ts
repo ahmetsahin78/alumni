@@ -1,10 +1,12 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import dotenv from "dotenv";
+import swaggerUi from "swagger-ui-express";
 import apiRoutes from "./routes";
-import { errorHandler } from "./middlewares/errorHandler";
+import { swaggerSpec } from "./docs/swaggerSpec";
+import utilityRoutes from "./routes/utility.routes";
 
 // Load environment variables
 dotenv.config();
@@ -13,27 +15,72 @@ const app = express();
 const PORT = process.env.PORT || 5001;
 
 // Global Middlewares
-app.use(helmet());
 app.use(
-  cors({
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
-    credentials: true,
+  helmet({
+    contentSecurityPolicy: false, // Allows Swagger UI to execute scripts and styles smoothly
   })
 );
+app.use(cors());
 app.use(morgan(process.env.NODE_ENV === "development" ? "dev" : "combined"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API Endpoints
+// Swagger UI - available at /api/swagger and /api-docs as requested
+const swaggerOptions: swaggerUi.SwaggerOptions = {
+  customSiteTitle: "Alumni Tracker API — Swagger Documentation",
+  customCss: ".swagger-ui .topbar { display: none }",
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true,
+    docExpansion: "list",
+    filter: true,
+    tryItOutEnabled: true,
+  },
+};
+
+app.use("/api/swagger", swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerOptions));
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerOptions));
+
+// Raw OpenAPI JSON endpoint
+app.get("/api/swagger.json", (req: Request, res: Response) => {
+  res.setHeader("Content-Type", "application/json");
+  res.json(swaggerSpec);
+});
+
+// Root Utility Routes (/hello/:name, /sum/:number1/:number2)
+app.use("/", utilityRoutes);
+
+// Main API Endpoints (/api/health, /api/alumni, /api/users)
 app.use("/api", apiRoutes);
 
-// Error Handling Middleware
-app.use(errorHandler);
+// Default 404 Handler for undefined routes
+app.use((req: Request, res: Response) => {
+  res.status(404).json({
+    error: `Endpoint '${req.method} ${req.originalUrl}' bulunamadı.`,
+    availableDocs: "/api/swagger",
+  });
+});
+
+// Global Error Handler
+app.use((err: any, req: Request, res: Response, next: any) => {
+  console.error("Unhandled server error:", err);
+  res.status(err.status || 500).json({
+    error: err.message || "Internal Server Error",
+  });
+});
 
 // Start Server
-app.listen(PORT, () => {
-  console.log(`🚀 Alumni Tracking API is running on http://localhost:${PORT}`);
-  console.log(`📋 Health check: http://localhost:${PORT}/api/health`);
-});
+if (process.env.NODE_ENV !== "test") {
+  app.listen(PORT, () => {
+    console.log(`\n======================================================`);
+    console.log(`🚀 Alumni Tracking Server is active!`);
+    console.log(`📡 URL: http://localhost:${PORT}`);
+    console.log(`📋 Health Check: http://localhost:${PORT}/api/health`);
+    console.log(`🎓 Alumni API:  http://localhost:${PORT}/api/alumni`);
+    console.log(`👤 Users API:   http://localhost:${PORT}/api/users`);
+    console.log(`📖 Swagger UI:  http://localhost:${PORT}/api/swagger`);
+    console.log(`======================================================\n`);
+  });
+}
 
 export default app;
