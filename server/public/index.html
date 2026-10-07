@@ -162,10 +162,28 @@
     </a>
 
     <div class="grid">
-      <a href="/api/alumni" class="card">
+      <a href="/users" class="card" style="border-color: #3b82f6; background: rgba(59, 130, 246, 0.08);">
         <div>
-          <div class="card-title">👥 /api/alumni</div>
-          <div class="card-desc">Tüm mezun listesini JSON formatında getirir.</div>
+          <div class="card-title">👤 /users (HTML View)</div>
+          <div class="card-desc">Sınıf içi görev: MVC HTML Kullanıcı Yönetim Arayüzü (CRUD).</div>
+        </div>
+      </a>
+      <a href="/announcements" class="card" style="border-color: #10b981; background: rgba(16, 185, 129, 0.08);">
+        <div>
+          <div class="card-title">📢 /announcements (View)</div>
+          <div class="card-desc">Ödev görevi: Duyuru Panosu ve Yönetim Arayüzü (Homework UI).</div>
+        </div>
+      </a>
+      <a href="/api/users" class="card">
+        <div>
+          <div class="card-title">👥 /api/users (JSON)</div>
+          <div class="card-desc">ApiUserController: RESTful JSON CRUD servisi.</div>
+        </div>
+      </a>
+      <a href="/api/announcements" class="card">
+        <div>
+          <div class="card-title">📰 /api/announcements</div>
+          <div class="card-desc">ApiAnnouncementController: RESTful Duyuru API.</div>
         </div>
       </a>
       <a href="/api/health" class="card">
@@ -174,34 +192,16 @@
           <div class="card-desc">Sistem ve sunucu sağlık durumu teşhisi.</div>
         </div>
       </a>
-      <a href="/api/users" class="card">
+      <a href="/api/alumni" class="card">
         <div>
-          <div class="card-title">👤 /api/users</div>
-          <div class="card-desc">Tahtadaki /api/users alias endpoint'i.</div>
-        </div>
-      </a>
-      <a href="/hello/Emre" class="card">
-        <div>
-          <div class="card-title">👋 /hello/:name</div>
-          <div class="card-desc">Selamlama yardımcı fonksiyonu.</div>
-        </div>
-      </a>
-      <a href="/sum/15/27" class="card">
-        <div>
-          <div class="card-title">➕ /sum/:n1/:n2</div>
-          <div class="card-desc">İki sayının toplamını döndüren fonksiyon.</div>
-        </div>
-      </a>
-      <a href="http://localhost:3000" target="_blank" class="card">
-        <div>
-          <div class="card-title">🌐 Next.js Arayüzü</div>
-          <div class="card-desc">React frontend arayüzü (Port 3000).</div>
+          <div class="card-title">🎓 /api/alumni</div>
+          <div class="card-desc">Hafta 03 mezun listesi REST endpoint'i.</div>
         </div>
       </a>
     </div>
 
     <div class="footer">
-      © 2026 Alumni Tracking System — Web Programming Week 03
+      © 2026 Alumni Tracking System — Web Programlama Hafta 04 (MVC Mimarisi)
     </div>
   </div>
 </body>

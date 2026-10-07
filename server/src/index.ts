@@ -8,6 +8,8 @@ import swaggerUi from "swagger-ui-express";
 import apiRoutes from "./routes";
 import { swaggerSpec } from "./docs/swaggerSpec";
 import utilityRoutes from "./routes/utility.routes";
+import userRoutes from "./routes/user.routes";
+import announcementRoutes from "./routes/announcement.routes";
 
 // Load environment variables
 dotenv.config();
@@ -79,7 +81,11 @@ app.get("/alumni", (req: Request, res: Response) => {
 // Root Utility Routes (/hello/:name, /sum/:number1/:number2)
 app.use("/", utilityRoutes);
 
-// Main API Endpoints (/api/health, /api/alumni, /api/users)
+// MVC HTML View Layer Routes (Week 04 In-Class & Homework Tasks)
+app.use("/users", userRoutes);
+app.use("/announcements", announcementRoutes);
+
+// Main REST API Endpoints (/api/health, /api/alumni, /api/users, /api/announcements)
 app.use("/api", apiRoutes);
 
 // Default 404 Handler for undefined routes
@@ -103,11 +109,14 @@ if (process.env.NODE_ENV !== "test") {
   app.listen(PORT, () => {
     console.log(`\n======================================================`);
     console.log(`🚀 Alumni Tracking Server is active!`);
-    console.log(`📡 Root URL:    http://localhost:${PORT}/`);
-    console.log(`📋 Health Check: http://localhost:${PORT}/api/health`);
-    console.log(`🎓 Alumni API:  http://localhost:${PORT}/api/alumni`);
-    console.log(`👤 Users API:   http://localhost:${PORT}/api/users`);
-    console.log(`📖 Swagger UI:  http://localhost:${PORT}/api/swagger`);
+    console.log(`📡 Root URL:            http://localhost:${PORT}/`);
+    console.log(`📋 Health Check:         http://localhost:${PORT}/api/health`);
+    console.log(`👤 Users (HTML View):   http://localhost:${PORT}/users`);
+    console.log(`📢 Announcements (View): http://localhost:${PORT}/announcements`);
+    console.log(`🎓 Alumni API:          http://localhost:${PORT}/api/alumni`);
+    console.log(`👤 Users API:           http://localhost:${PORT}/api/users`);
+    console.log(`📢 Announcements API:   http://localhost:${PORT}/api/announcements`);
+    console.log(`📖 Swagger UI:          http://localhost:${PORT}/api/swagger`);
     console.log(`======================================================\n`);
   });
 }
