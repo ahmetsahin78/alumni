@@ -1,10 +1,10 @@
 /**
  * ============================================================================
- * ApiUserController (RESTful JSON API Controller)
+ * ApiUserController (RESTful JSON API Controller - Database Persistence)
  * ============================================================================
  * İstanbul Üniversitesi Web Programlama Dersi - Hafta 04: Sınıf İçi Görevler
- * Görev: ApiUserController adında JSON API controller'ı oluştur ve
- * içine tam CRUD fonksiyonlarını entegre et.
+ * Görev: ApiUserController üzerinden veritabanı (db conn) bağlantılı
+ * RESTful JSON CRUD işlemlerini sağlamak.
  * ============================================================================
  */
 
@@ -15,26 +15,26 @@ export class ApiUserController {
   /**
    * GET /api/users -> Tüm kullanıcıları JSON formatında listele
    */
-  public static getUsers(req: Request, res: Response): void {
+  public static async getUsers(req: Request, res: Response): Promise<void> {
     const search = req.query.search as string | undefined;
     const department = req.query.department as string | undefined;
     const role = req.query.role as string | undefined;
 
-    const users = userModel.findAll({ search, department, role });
+    const users = await userModel.findAll({ search, department, role });
     res.status(200).json(users);
   }
 
   /**
    * GET /api/users/:id -> ID'ye göre tekil kullanıcı getir
    */
-  public static getUserById(req: Request, res: Response): void {
-    const id = parseInt(req.params.id as string, 10);
-    if (isNaN(id)) {
-      res.status(400).json({ error: "Geçersiz ID formatı. Sayısal bir değer giriniz." });
+  public static async getUserById(req: Request, res: Response): Promise<void> {
+    const id = (req.params.id as string)?.trim();
+    if (!id) {
+      res.status(400).json({ error: "Geçersiz ID formatı." });
       return;
     }
 
-    const user = userModel.findById(id);
+    const user = await userModel.findById(id);
     if (!user) {
       res.status(404).json({ error: `ID: ${id} olan kullanıcı bulunamadı.` });
       return;
@@ -46,7 +46,7 @@ export class ApiUserController {
   /**
    * POST /api/users -> Yeni kullanıcı ekle (201 Created)
    */
-  public static createUser(req: Request, res: Response): void {
+  public static async createUser(req: Request, res: Response): Promise<void> {
     const { name, email, role, graduationYear, department, company } = req.body;
 
     if (!name || typeof name !== "string" || !name.trim()) {
@@ -63,7 +63,7 @@ export class ApiUserController {
       ? email.trim()
       : `${name.toLowerCase().replace(/\s+/g, ".")}@alumni.edu`;
 
-    const newUser = userModel.create({
+    const newUser = await userModel.create({
       name: name.trim(),
       email: defaultEmail,
       role: role || "Alumni",
@@ -78,9 +78,9 @@ export class ApiUserController {
   /**
    * PUT /api/users/:id -> Bütünsel güncelleme
    */
-  public static updateUser(req: Request, res: Response): void {
-    const id = parseInt(req.params.id as string, 10);
-    if (isNaN(id)) {
+  public static async updateUser(req: Request, res: Response): Promise<void> {
+    const id = (req.params.id as string)?.trim();
+    if (!id) {
       res.status(400).json({ error: "Geçersiz ID formatı." });
       return;
     }
@@ -97,7 +97,7 @@ export class ApiUserController {
       return;
     }
 
-    const updatedUser = userModel.replace(id, {
+    const updatedUser = await userModel.replace(id, {
       name: name.trim(),
       email: email ? email.trim() : `${name.toLowerCase().replace(/\s+/g, ".")}@alumni.edu`,
       role: role || "Alumni",
@@ -117,9 +117,9 @@ export class ApiUserController {
   /**
    * PATCH /api/users/:id -> Kısmi güncelleme
    */
-  public static patchUser(req: Request, res: Response): void {
-    const id = parseInt(req.params.id as string, 10);
-    if (isNaN(id)) {
+  public static async patchUser(req: Request, res: Response): Promise<void> {
+    const id = (req.params.id as string)?.trim();
+    if (!id) {
       res.status(400).json({ error: "Geçersiz ID formatı." });
       return;
     }
@@ -129,7 +129,7 @@ export class ApiUserController {
       return;
     }
 
-    const patchedUser = userModel.patch(id, req.body);
+    const patchedUser = await userModel.patch(id, req.body);
     if (!patchedUser) {
       res.status(404).json({ error: `ID: ${id} olan kullanıcı bulunamadı.` });
       return;
@@ -141,14 +141,14 @@ export class ApiUserController {
   /**
    * DELETE /api/users/:id -> Kullanıcı kaydını sil
    */
-  public static deleteUser(req: Request, res: Response): void {
-    const id = parseInt(req.params.id as string, 10);
-    if (isNaN(id)) {
+  public static async deleteUser(req: Request, res: Response): Promise<void> {
+    const id = (req.params.id as string)?.trim();
+    if (!id) {
       res.status(400).json({ error: "Geçersiz ID formatı." });
       return;
     }
 
-    const deletedUser = userModel.delete(id);
+    const deletedUser = await userModel.delete(id);
     if (!deletedUser) {
       res.status(404).json({ error: `ID: ${id} olan kullanıcı bulunamadı.` });
       return;

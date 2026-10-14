@@ -1,10 +1,10 @@
 /**
  * ============================================================================
- * UserController (MVC View Controller)
+ * UserController (MVC View Controller - Database Persistence)
  * ============================================================================
  * İstanbul Üniversitesi Web Programlama Dersi - Hafta 04: Sınıf İçi Görevler
- * Görev: View katmanı ile bağlantılı UserController oluştur ve tüm CRUD
- * işlemlerini HTML arayüzü üzerinden yönet.
+ * Görev: View katmanı ile bağlantılı UserController üzerinden veritabanı (db conn)
+ * kalıcılığı sağlayan CRUD arayüzü sunmak.
  * ============================================================================
  */
 
@@ -16,10 +16,10 @@ export class UserController {
   /**
    * 1. GET /users -> Kullanıcıları Listele (Read - All)
    */
-  public static index(req: Request, res: Response): void {
+  public static async index(req: Request, res: Response): Promise<void> {
     const search = req.query.search as string | undefined;
     const alertMessage = req.query.msg as string | undefined;
-    const users = userModel.findAll({ search });
+    const users = await userModel.findAll({ search });
     const html = UserViews.renderList(users, search, alertMessage);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.status(200).send(html);
@@ -37,7 +37,7 @@ export class UserController {
   /**
    * 3. POST /users -> Yeni Kullanıcı Kaydet (Create)
    */
-  public static create(req: Request, res: Response): void {
+  public static async create(req: Request, res: Response): Promise<void> {
     const { name, email, role, graduationYear, department, company } = req.body;
 
     if (!name || !email || !graduationYear || !department) {
@@ -59,7 +59,7 @@ export class UserController {
       return;
     }
 
-    const newUser = userModel.create({
+    const newUser = await userModel.create({
       name,
       email,
       role: role || "Alumni",
@@ -74,17 +74,18 @@ export class UserController {
   /**
    * 4. GET /users/:id -> Tekil Kullanıcı Detayı (Read - One)
    */
-  public static show(req: Request, res: Response): void {
-    const id = parseInt(req.params.id as string, 10);
-    if (isNaN(id)) {
+  public static async show(req: Request, res: Response): Promise<void> {
+    const id = (req.params.id as string)?.trim();
+    if (!id) {
       res.redirect("/users?msg=" + encodeURIComponent("Geçersiz kullanıcı kimliği."));
       return;
     }
 
-    const user = userModel.findById(id);
+    const user = await userModel.findById(id);
     if (!user) {
+      const allUsers = await userModel.findAll();
       res.status(404).send(
-        UserViews.renderList(userModel.findAll(), undefined, `ID: #${id} olan kullanıcı bulunamadı.`)
+        UserViews.renderList(allUsers, undefined, `ID: #${id} olan kullanıcı bulunamadı.`)
       );
       return;
     }
@@ -97,14 +98,14 @@ export class UserController {
   /**
    * 5. GET /users/:id/edit -> Kullanıcı Düzenleme Formu
    */
-  public static editForm(req: Request, res: Response): void {
-    const id = parseInt(req.params.id as string, 10);
-    if (isNaN(id)) {
+  public static async editForm(req: Request, res: Response): Promise<void> {
+    const id = (req.params.id as string)?.trim();
+    if (!id) {
       res.redirect("/users");
       return;
     }
 
-    const user = userModel.findById(id);
+    const user = await userModel.findById(id);
     if (!user) {
       res.redirect("/users");
       return;
@@ -118,9 +119,9 @@ export class UserController {
   /**
    * 6. POST /users/:id/edit (veya POST /users/:id) -> Kullanıcı Güncelle (Update)
    */
-  public static update(req: Request, res: Response): void {
-    const id = parseInt(req.params.id as string, 10);
-    if (isNaN(id)) {
+  public static async update(req: Request, res: Response): Promise<void> {
+    const id = (req.params.id as string)?.trim();
+    if (!id) {
       res.redirect("/users");
       return;
     }
@@ -128,7 +129,7 @@ export class UserController {
     const { name, email, role, graduationYear, department, company } = req.body;
 
     if (!name || !email || !graduationYear || !department) {
-      const existing = userModel.findById(id);
+      const existing = await userModel.findById(id);
       if (!existing) {
         res.redirect("/users");
         return;
@@ -141,7 +142,7 @@ export class UserController {
       return;
     }
 
-    const updated = userModel.replace(id, {
+    const updated = await userModel.replace(id, {
       name,
       email,
       role: role || "Alumni",
@@ -161,10 +162,10 @@ export class UserController {
   /**
    * 7. POST /users/:id/delete -> Kullanıcı Sil (Delete)
    */
-  public static delete(req: Request, res: Response): void {
-    const id = parseInt(req.params.id as string, 10);
-    if (!isNaN(id)) {
-      const deleted = userModel.delete(id);
+  public static async delete(req: Request, res: Response): Promise<void> {
+    const id = (req.params.id as string)?.trim();
+    if (id) {
+      const deleted = await userModel.delete(id);
       const msg = deleted
         ? `${deleted.name} başarıyla silindi.`
         : "Silinecek kullanıcı bulunamadı.";

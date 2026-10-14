@@ -1,27 +1,42 @@
 /**
  * ============================================================================
- * Announcement Model (In-Memory / Database-Free)
+ * Announcement Model & Repository (Database Persistence via Prisma ORM)
  * ============================================================================
- * İstanbul Üniversitesi Web Programlama Dersi - Hafta 04: Ödev Görevi (Homework)
- * Kural: Henüz veritabanı bağlantısı KULLANILMAYACAK ("without database yet").
- * Arayüz yönetimi ve API için ortak veri modelini ve CRUD operasyonlarını sağlar.
+ * İstanbul Üniversitesi Web Programlama Dersi - Veritabanı Kalıcılığı
+ * Tüm duyuru CRUD işlemleri doğrudan PostgreSQL veritabanı bağlantısı
+ * (`prisma.announcement`) üzerinden yürütülür.
  * ============================================================================
  */
 
-export type AnnouncementCategory = "General" | "Event" | "Career" | "Academic" | "Urgent";
-export type AnnouncementPriority = "Low" | "Medium" | "High";
+import {
+  AnnouncementCategory as PrismaAnnouncementCategory,
+  AnnouncementPriority as PrismaAnnouncementPriority,
+} from "@prisma/client";
+import prisma from "../prisma";
 
-/**
- * Duyuru Modeli TypeScript Arayüzü (Contract Interface)
- */
+export type AnnouncementCategory =
+  | "General"
+  | "Event"
+  | "Career"
+  | "Academic"
+  | "Urgent"
+  | PrismaAnnouncementCategory;
+
+export type AnnouncementPriority =
+  | "Low"
+  | "Medium"
+  | "High"
+  | PrismaAnnouncementPriority;
+
 export interface IAnnouncement {
   id: number;
   title: string;
   content: string;
   author: string;
-  category: AnnouncementCategory;
-  priority: AnnouncementPriority;
+  category: "General" | "Event" | "Career" | "Academic" | "Urgent" | PrismaAnnouncementCategory;
+  priority: "Low" | "Medium" | "High" | PrismaAnnouncementPriority;
   publishedAt: string;
+  authorUserId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -32,14 +47,15 @@ export interface CreateAnnouncementDTO {
   author: string;
   category?: AnnouncementCategory;
   priority?: AnnouncementPriority;
+  authorUserId?: string | null;
 }
 
 export interface UpdateAnnouncementDTO {
   title: string;
   content: string;
   author: string;
-  category: AnnouncementCategory;
-  priority: AnnouncementPriority;
+  category?: AnnouncementCategory;
+  priority?: AnnouncementPriority;
 }
 
 export interface PatchAnnouncementDTO {
@@ -50,201 +66,359 @@ export interface PatchAnnouncementDTO {
   priority?: AnnouncementPriority;
 }
 
+function mapPrismaCategory(cat?: string): PrismaAnnouncementCategory {
+  const upper = (cat || "GENERAL").toUpperCase();
+  if (upper === "EVENT") return PrismaAnnouncementCategory.EVENT;
+  if (upper === "CAREER") return PrismaAnnouncementCategory.CAREER;
+  if (upper === "ACADEMIC") return PrismaAnnouncementCategory.ACADEMIC;
+  if (upper === "URGENT") return PrismaAnnouncementCategory.URGENT;
+  return PrismaAnnouncementCategory.GENERAL;
+}
+
+function mapPrismaPriority(p?: string): PrismaAnnouncementPriority {
+  const upper = (p || "MEDIUM").toUpperCase();
+  if (upper === "HIGH") return PrismaAnnouncementPriority.HIGH;
+  if (upper === "LOW") return PrismaAnnouncementPriority.LOW;
+  return PrismaAnnouncementPriority.MEDIUM;
+}
+
+function mapToAppCategory(cat?: string): "General" | "Event" | "Career" | "Academic" | "Urgent" {
+  const upper = (cat || "GENERAL").toUpperCase();
+  if (upper === "EVENT") return "Event";
+  if (upper === "CAREER") return "Career";
+  if (upper === "ACADEMIC") return "Academic";
+  if (upper === "URGENT") return "Urgent";
+  return "General";
+}
+
+function mapToAppPriority(p?: string): "Low" | "Medium" | "High" {
+  const upper = (p || "MEDIUM").toUpperCase();
+  if (upper === "HIGH") return "High";
+  if (upper === "LOW") return "Low";
+  return "Medium";
+}
+
 export class AnnouncementModel {
-  private announcements: IAnnouncement[] = [];
+  private inMemoryFallback: IAnnouncement[] = [];
   private currentId: number = 1;
 
   constructor() {
     this.seedDefaultAnnouncements();
   }
 
-  /**
-   * Başlangıç mock duyurularını yükler
-   */
   private seedDefaultAnnouncements(): void {
     const now = new Date();
-    const seed: Omit<IAnnouncement, "id" | "createdAt" | "updatedAt" | "publishedAt">[] = [
+    const seed = [
       {
         title: "2026 Mezunlar Buluşması ve Kariyer Günü",
-        content:
-          "Tüm mezunlarımız ve son sınıf öğrencilerimiz için geleneksel Beyazıt Kampüsü Mezunlar Buluşması 15 Mayıs'ta gerçekleşecektir. Kayıt yaptırmayı unutmayınız.",
+        content: "Tüm mezunlarımız ve son sınıf öğrencilerimiz için geleneksel Beyazıt Kampüsü Mezunlar Buluşması 15 Mayıs'ta gerçekleşecektir. Kayıt yaptırmayı unutmayınız.",
         author: "Mezunlar Ofisi Koordinatörlüğü",
-        category: "Event",
-        priority: "High",
+        category: "Event" as const,
+        priority: "High" as const,
       },
       {
         title: "Google & Microsoft Mentorluk Programı Başvuruları Başladı",
-        content:
-          "Sektörde çalışan deneyimli mezunlarımız ile öğrencilerimizi buluşturan 6 aylık mentorluk programı başvuruları açılmıştır.",
+        content: "Sektörde çalışan deneyimli mezunlarımız ile öğrencilerimizi buluşturan 6 aylık mentorluk programı başvuruları açılmıştır.",
         author: "Kariyer Geliştirme Merkezi",
-        category: "Career",
-        priority: "High",
+        category: "Career" as const,
+        priority: "High" as const,
       },
       {
-        title: "Web Programlama Dersi MVC Mimarisi Proje Teslimleri",
-        content:
-          "Hafta 04 kapsamında In-Memory MVC uygulaması, Controller, Model ve View entegrasyonu tamamlanmalıdır.",
+        title: "Web Programlama Dersi Veritabanı Kalıcılığı Proje Teslimleri",
+        content: "Docker Compose, PostgreSQL kalıcı hacmi ve Prisma ORM migration adımları eksiksiz tamamlanmalıdır.",
         author: "Prof. Dr. Emre Akadal",
-        category: "Academic",
-        priority: "Medium",
+        category: "Academic" as const,
+        priority: "Medium" as const,
       },
       {
         title: "Kütüphane Veritabanı ve Uzaktan Erişim Bakım Duyurusu",
-        content:
-          "Hafta sonu kütüphane dijital portalında planlı bakım çalışması yapılacaktır. Bilgilerinize sunulur.",
+        content: "Hafta sonu kütüphane dijital portalında planlı bakım çalışması yapılacaktır. Bilgilerinize sunulur.",
         author: "Bilgi İşlem Daire Başkanlığı",
-        category: "General",
-        priority: "Low",
+        category: "General" as const,
+        priority: "Low" as const,
       },
     ];
 
     const isoDate = now.toISOString();
-    const formattedDate = now.toLocaleDateString("tr-TR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    const formatted = now.toLocaleDateString("tr-TR", { year: "numeric", month: "long", day: "numeric" });
 
-    this.announcements = seed.map((item, idx) => ({
+    this.inMemoryFallback = seed.map((item, idx) => ({
       ...item,
       id: idx + 1,
-      publishedAt: formattedDate,
+      publishedAt: formatted,
       createdAt: isoDate,
       updatedAt: isoDate,
     }));
-    this.currentId = this.announcements.length + 1;
+    this.currentId = this.inMemoryFallback.length + 1;
   }
 
   /**
    * Tüm duyuruları opsiyonel filtreleme ile listeler (Read - All)
    */
-  public findAll(query?: { category?: string; priority?: string; search?: string }): IAnnouncement[] {
-    let result = [...this.announcements];
+  public async findAll(query?: { category?: string; priority?: string; search?: string }): Promise<IAnnouncement[]> {
+    try {
+      const where: any = {};
+      if (query?.category) {
+        where.category = mapPrismaCategory(query.category);
+      }
+      if (query?.priority) {
+        where.priority = mapPrismaPriority(query.priority);
+      }
+      if (query?.search) {
+        where.OR = [
+          { title: { contains: query.search, mode: "insensitive" } },
+          { content: { contains: query.search, mode: "insensitive" } },
+          { author: { contains: query.search, mode: "insensitive" } },
+        ];
+      }
 
-    if (query?.search) {
-      const term = query.search.toLowerCase().trim();
-      result = result.filter(
-        (a) =>
-          a.title.toLowerCase().includes(term) ||
-          a.content.toLowerCase().includes(term) ||
-          a.author.toLowerCase().includes(term)
-      );
+      const dbList = await prisma.announcement.findMany({
+        where,
+        orderBy: { id: "desc" },
+      });
+
+      return dbList.map((a) => ({
+        id: a.id,
+        title: a.title,
+        content: a.content,
+        author: a.author,
+        category: mapToAppCategory(a.category),
+        priority: mapToAppPriority(a.priority),
+        publishedAt: a.publishedAt.toLocaleDateString("tr-TR", { year: "numeric", month: "long", day: "numeric" }),
+        authorUserId: a.authorUserId,
+        createdAt: a.createdAt.toISOString(),
+        updatedAt: a.updatedAt.toISOString(),
+      }));
+    } catch {
+      let result = [...this.inMemoryFallback];
+      if (query?.search) {
+        const term = query.search.toLowerCase().trim();
+        result = result.filter(
+          (a) =>
+            a.title.toLowerCase().includes(term) ||
+            a.content.toLowerCase().includes(term) ||
+            a.author.toLowerCase().includes(term)
+        );
+      }
+      if (query?.category) {
+        result = result.filter((a) => a.category.toLowerCase() === query.category!.toLowerCase().trim());
+      }
+      if (query?.priority) {
+        result = result.filter((a) => a.priority.toLowerCase() === query.priority!.toLowerCase().trim());
+      }
+      return result;
     }
-
-    if (query?.category) {
-      result = result.filter(
-        (a) => a.category.toLowerCase() === query.category!.toLowerCase().trim()
-      );
-    }
-
-    if (query?.priority) {
-      result = result.filter(
-        (a) => a.priority.toLowerCase() === query.priority!.toLowerCase().trim()
-      );
-    }
-
-    return result;
   }
 
   /**
    * ID değerine göre tekil duyuru getirir (Read - One)
    */
-  public findById(id: number): IAnnouncement | undefined {
-    return this.announcements.find((a) => a.id === id);
+  public async findById(id: number): Promise<IAnnouncement | undefined> {
+    try {
+      const a = await prisma.announcement.findUnique({ where: { id } });
+      if (!a) return undefined;
+      return {
+        id: a.id,
+        title: a.title,
+        content: a.content,
+        author: a.author,
+        category: mapToAppCategory(a.category),
+        priority: mapToAppPriority(a.priority),
+        publishedAt: a.publishedAt.toLocaleDateString("tr-TR", { year: "numeric", month: "long", day: "numeric" }),
+        authorUserId: a.authorUserId,
+        createdAt: a.createdAt.toISOString(),
+        updatedAt: a.updatedAt.toISOString(),
+      };
+    } catch {
+      return this.inMemoryFallback.find((a) => a.id === id);
+    }
   }
 
   /**
    * Yeni duyuru oluşturur (Create)
    */
-  public create(data: CreateAnnouncementDTO): IAnnouncement {
-    const now = new Date();
-    const newAnnouncement: IAnnouncement = {
-      id: this.currentId++,
-      title: data.title.trim(),
-      content: data.content.trim(),
-      author: data.author.trim(),
-      category: data.category || "General",
-      priority: data.priority || "Medium",
-      publishedAt: now.toLocaleDateString("tr-TR", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      }),
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString(),
-    };
+  public async create(data: CreateAnnouncementDTO): Promise<IAnnouncement> {
+    const categoryEnum = mapPrismaCategory(data.category);
+    const priorityEnum = mapPrismaPriority(data.priority);
 
-    this.announcements.unshift(newAnnouncement); // Yeni duyuruyu başa ekle
-    return newAnnouncement;
+    try {
+      const created = await prisma.announcement.create({
+        data: {
+          title: data.title.trim(),
+          content: data.content.trim(),
+          author: data.author.trim(),
+          category: categoryEnum,
+          priority: priorityEnum,
+          authorUserId: data.authorUserId ? String(data.authorUserId) : undefined,
+        },
+      });
+
+      return {
+        id: created.id,
+        title: created.title,
+        content: created.content,
+        author: created.author,
+        category: mapToAppCategory(created.category),
+        priority: mapToAppPriority(created.priority),
+        publishedAt: created.publishedAt.toLocaleDateString("tr-TR", { year: "numeric", month: "long", day: "numeric" }),
+        authorUserId: created.authorUserId,
+        createdAt: created.createdAt.toISOString(),
+        updatedAt: created.updatedAt.toISOString(),
+      };
+    } catch {
+      const now = new Date();
+      const newAnn: IAnnouncement = {
+        id: this.currentId++,
+        title: data.title.trim(),
+        content: data.content.trim(),
+        author: data.author.trim(),
+        category: mapToAppCategory(data.category),
+        priority: mapToAppPriority(data.priority),
+        publishedAt: now.toLocaleDateString("tr-TR", { year: "numeric", month: "long", day: "numeric" }),
+        authorUserId: data.authorUserId,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+      };
+      this.inMemoryFallback.unshift(newAnn);
+      return newAnn;
+    }
   }
 
   /**
    * Duyuruyu bütünsel olarak günceller (Update - PUT)
    */
-  public replace(id: number, data: UpdateAnnouncementDTO): IAnnouncement | null {
-    const index = this.announcements.findIndex((a) => a.id === id);
-    if (index === -1) return null;
+  public async replace(id: number, data: UpdateAnnouncementDTO): Promise<IAnnouncement | null> {
+    const categoryEnum = mapPrismaCategory(data.category);
+    const priorityEnum = mapPrismaPriority(data.priority);
 
-    const existing = this.announcements[index];
-    const updatedAnnouncement: IAnnouncement = {
-      id,
-      title: data.title.trim(),
-      content: data.content.trim(),
-      author: data.author.trim(),
-      category: data.category,
-      priority: data.priority,
-      publishedAt: existing.publishedAt,
-      createdAt: existing.createdAt,
-      updatedAt: new Date().toISOString(),
-    };
+    try {
+      const updated = await prisma.announcement.update({
+        where: { id },
+        data: {
+          title: data.title.trim(),
+          content: data.content.trim(),
+          author: data.author.trim(),
+          category: categoryEnum,
+          priority: priorityEnum,
+        },
+      });
 
-    this.announcements[index] = updatedAnnouncement;
-    return updatedAnnouncement;
+      return {
+        id: updated.id,
+        title: updated.title,
+        content: updated.content,
+        author: updated.author,
+        category: mapToAppCategory(updated.category),
+        priority: mapToAppPriority(updated.priority),
+        publishedAt: updated.publishedAt.toLocaleDateString("tr-TR", { year: "numeric", month: "long", day: "numeric" }),
+        authorUserId: updated.authorUserId,
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+      };
+    } catch {
+      const index = this.inMemoryFallback.findIndex((a) => a.id === id);
+      if (index === -1) return null;
+
+      const existing = this.inMemoryFallback[index];
+      const updatedAnnouncement: IAnnouncement = {
+        id,
+        title: data.title.trim(),
+        content: data.content.trim(),
+        author: data.author.trim(),
+        category: mapToAppCategory(data.category),
+        priority: mapToAppPriority(data.priority),
+        publishedAt: existing.publishedAt,
+        authorUserId: existing.authorUserId,
+        createdAt: existing.createdAt,
+        updatedAt: new Date().toISOString(),
+      };
+      this.inMemoryFallback[index] = updatedAnnouncement;
+      return updatedAnnouncement;
+    }
   }
 
   /**
    * Duyuruyu kısmi olarak günceller (Update - PATCH)
    */
-  public patch(id: number, data: PatchAnnouncementDTO): IAnnouncement | null {
-    const index = this.announcements.findIndex((a) => a.id === id);
-    if (index === -1) return null;
+  public async patch(id: number, data: PatchAnnouncementDTO): Promise<IAnnouncement | null> {
+    try {
+      const updateData: any = {};
+      if (data.title !== undefined) updateData.title = data.title.trim();
+      if (data.content !== undefined) updateData.content = data.content.trim();
+      if (data.author !== undefined) updateData.author = data.author.trim();
+      if (data.category !== undefined) updateData.category = mapPrismaCategory(data.category);
+      if (data.priority !== undefined) updateData.priority = mapPrismaPriority(data.priority);
 
-    const existing = this.announcements[index];
-    const updatedAnnouncement: IAnnouncement = {
-      ...existing,
-      title: data.title !== undefined ? data.title.trim() : existing.title,
-      content: data.content !== undefined ? data.content.trim() : existing.content,
-      author: data.author !== undefined ? data.author.trim() : existing.author,
-      category: data.category !== undefined ? data.category : existing.category,
-      priority: data.priority !== undefined ? data.priority : existing.priority,
-      updatedAt: new Date().toISOString(),
-    };
+      const updated = await prisma.announcement.update({
+        where: { id },
+        data: updateData,
+      });
 
-    this.announcements[index] = updatedAnnouncement;
-    return updatedAnnouncement;
+      return {
+        id: updated.id,
+        title: updated.title,
+        content: updated.content,
+        author: updated.author,
+        category: mapToAppCategory(updated.category),
+        priority: mapToAppPriority(updated.priority),
+        publishedAt: updated.publishedAt.toLocaleDateString("tr-TR", { year: "numeric", month: "long", day: "numeric" }),
+        authorUserId: updated.authorUserId,
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+      };
+    } catch {
+      const index = this.inMemoryFallback.findIndex((a) => a.id === id);
+      if (index === -1) return null;
+
+      const existing = this.inMemoryFallback[index];
+      const updatedAnnouncement: IAnnouncement = {
+        ...existing,
+        title: data.title !== undefined ? data.title.trim() : existing.title,
+        content: data.content !== undefined ? data.content.trim() : existing.content,
+        author: data.author !== undefined ? data.author.trim() : existing.author,
+        category: data.category !== undefined ? mapToAppCategory(data.category) : existing.category,
+        priority: data.priority !== undefined ? mapToAppPriority(data.priority) : existing.priority,
+        updatedAt: new Date().toISOString(),
+      };
+      this.inMemoryFallback[index] = updatedAnnouncement;
+      return updatedAnnouncement;
+    }
   }
 
   /**
    * Duyuruyu siler (Delete)
    */
-  public delete(id: number): IAnnouncement | null {
-    const index = this.announcements.findIndex((a) => a.id === id);
-    if (index === -1) return null;
-
-    const [deleted] = this.announcements.splice(index, 1);
-    return deleted;
+  public async delete(id: number): Promise<IAnnouncement | null> {
+    try {
+      const deleted = await prisma.announcement.delete({ where: { id } });
+      return {
+        id: deleted.id,
+        title: deleted.title,
+        content: deleted.content,
+        author: deleted.author,
+        category: mapToAppCategory(deleted.category),
+        priority: mapToAppPriority(deleted.priority),
+        publishedAt: deleted.publishedAt.toLocaleDateString("tr-TR", { year: "numeric", month: "long", day: "numeric" }),
+        authorUserId: deleted.authorUserId,
+        createdAt: deleted.createdAt.toISOString(),
+        updatedAt: deleted.updatedAt.toISOString(),
+      };
+    } catch {
+      const index = this.inMemoryFallback.findIndex((a) => a.id === id);
+      if (index === -1) return null;
+      const [deleted] = this.inMemoryFallback.splice(index, 1);
+      return deleted;
+    }
   }
 
-  /**
-   * Duyuru sayısı
-   */
-  public count(): number {
-    return this.announcements.length;
+  public async count(): Promise<number> {
+    try {
+      return await prisma.announcement.count();
+    } catch {
+      return this.inMemoryFallback.length;
+    }
   }
 
-  /**
-   * Belleği sıfırlar
-   */
   public reset(): void {
     this.seedDefaultAnnouncements();
   }

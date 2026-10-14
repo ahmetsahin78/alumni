@@ -33,3 +33,4 @@ router.post("/:id/delete", AnnouncementController.delete);
 router.get("/:id/delete", AnnouncementController.delete);
 
 export default router;
+

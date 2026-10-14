@@ -1,10 +1,10 @@
 /**
  * ============================================================================
- * ApiAnnouncementController (RESTful JSON API Controller)
+ * ApiAnnouncementController (RESTful JSON API Controller - Database Persistence)
  * ============================================================================
  * İstanbul Üniversitesi Web Programlama Dersi - Hafta 04: Ödev Görevleri (Homework)
- * Görev: Duyurular için API controller'ı oluştur ve JSON tabanlı CRUD
- * servislerini sağla.
+ * Görev: Duyurular için API controller'ı oluştur ve doğrudan PostgreSQL veritabanı
+ * (`prisma.announcement`) üzerinden JSON tabanlı CRUD servislerini sağla.
  * ============================================================================
  */
 
@@ -19,26 +19,26 @@ export class ApiAnnouncementController {
   /**
    * GET /api/announcements -> Tüm duyuruları listele
    */
-  public static getAnnouncements(req: Request, res: Response): void {
+  public static async getAnnouncements(req: Request, res: Response): Promise<void> {
     const search = req.query.search as string | undefined;
     const category = req.query.category as string | undefined;
     const priority = req.query.priority as string | undefined;
 
-    const announcements = announcementModel.findAll({ search, category, priority });
+    const announcements = await announcementModel.findAll({ search, category, priority });
     res.status(200).json(announcements);
   }
 
   /**
    * GET /api/announcements/:id -> ID'ye göre tekil duyuru getir
    */
-  public static getAnnouncementById(req: Request, res: Response): void {
+  public static async getAnnouncementById(req: Request, res: Response): Promise<void> {
     const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) {
       res.status(400).json({ error: "Geçersiz ID formatı. Sayısal bir değer giriniz." });
       return;
     }
 
-    const announcement = announcementModel.findById(id);
+    const announcement = await announcementModel.findById(id);
     if (!announcement) {
       res.status(404).json({ error: `ID: ${id} olan duyuru bulunamadı.` });
       return;
@@ -50,7 +50,7 @@ export class ApiAnnouncementController {
   /**
    * POST /api/announcements -> Yeni duyuru ekle (201 Created)
    */
-  public static createAnnouncement(req: Request, res: Response): void {
+  public static async createAnnouncement(req: Request, res: Response): Promise<void> {
     const { title, content, author, category, priority } = req.body;
 
     if (!title || typeof title !== "string" || !title.trim()) {
@@ -68,12 +68,12 @@ export class ApiAnnouncementController {
       return;
     }
 
-    const newAnnouncement = announcementModel.create({
+    const newAnnouncement = await announcementModel.create({
       title: title.trim(),
       content: content.trim(),
       author: author.trim(),
-      category: (category as AnnouncementCategory) || "General",
-      priority: (priority as AnnouncementPriority) || "Medium",
+      category: (category as AnnouncementCategory) || "GENERAL",
+      priority: (priority as AnnouncementPriority) || "MEDIUM",
     });
 
     res.status(201).json(newAnnouncement);
@@ -82,7 +82,7 @@ export class ApiAnnouncementController {
   /**
    * PUT /api/announcements/:id -> Bütünsel güncelleme
    */
-  public static updateAnnouncement(req: Request, res: Response): void {
+  public static async updateAnnouncement(req: Request, res: Response): Promise<void> {
     const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) {
       res.status(400).json({ error: "Geçersiz ID formatı." });
@@ -98,12 +98,12 @@ export class ApiAnnouncementController {
       return;
     }
 
-    const updated = announcementModel.replace(id, {
+    const updated = await announcementModel.replace(id, {
       title: title.trim(),
       content: content.trim(),
       author: author.trim(),
-      category: (category as AnnouncementCategory) || "General",
-      priority: (priority as AnnouncementPriority) || "Medium",
+      category: (category as AnnouncementCategory) || "GENERAL",
+      priority: (priority as AnnouncementPriority) || "MEDIUM",
     });
 
     if (!updated) {
@@ -117,7 +117,7 @@ export class ApiAnnouncementController {
   /**
    * PATCH /api/announcements/:id -> Kısmi güncelleme
    */
-  public static patchAnnouncement(req: Request, res: Response): void {
+  public static async patchAnnouncement(req: Request, res: Response): Promise<void> {
     const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) {
       res.status(400).json({ error: "Geçersiz ID formatı." });
@@ -129,7 +129,7 @@ export class ApiAnnouncementController {
       return;
     }
 
-    const patched = announcementModel.patch(id, req.body);
+    const patched = await announcementModel.patch(id, req.body);
     if (!patched) {
       res.status(404).json({ error: `ID: ${id} olan duyuru bulunamadı.` });
       return;
@@ -141,14 +141,14 @@ export class ApiAnnouncementController {
   /**
    * DELETE /api/announcements/:id -> Duyuru sil
    */
-  public static deleteAnnouncement(req: Request, res: Response): void {
+  public static async deleteAnnouncement(req: Request, res: Response): Promise<void> {
     const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) {
       res.status(400).json({ error: "Geçersiz ID formatı." });
       return;
     }
 
-    const deleted = announcementModel.delete(id);
+    const deleted = await announcementModel.delete(id);
     if (!deleted) {
       res.status(404).json({ error: `ID: ${id} olan duyuru bulunamadı.` });
       return;

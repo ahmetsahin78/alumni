@@ -32,3 +32,4 @@ router.patch("/:id", ApiAnnouncementController.patchAnnouncement);
 router.delete("/:id", ApiAnnouncementController.deleteAnnouncement);
 
 export default router;
+

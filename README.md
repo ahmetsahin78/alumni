@@ -2,9 +2,12 @@
 
 A modern, comprehensive web platform designed for universities (such as Istanbul University) and educational academies to maintain strong, lifelong connections with their graduates. This system centralizes career tracking, mentorship programs, job postings, and detailed institutional statistics under one roof.
 
+> 📊 **Veritabanı ve Veri Tasarımı Dokümantasyonu:**
+> Tüm veritabanı tabloları, ER diyagramı, PK/FK kısıtlamaları ve alan spesifikasyonları için ➡️ [ddd.md (Data Design Documentation)](./ddd.md) dosyasına bakınız.
+
 ---
 
-## 🏛️ Hafta 04: MVC (Model - View - Controller) Mimarisi
+## 🏛️ Hafta 04: MVC (Model - View - Controller) Mimarisi ve Veritabanı Entegrasyonu
 
 Bu hafta kapsamında projemiz, **Clean Architecture** ve **MVC (Model-View-Controller)** tasarım deseni prensiplerine göre yapılandırılmıştır. Eğitmenin ders içi yönergesi doğrultusunda **henüz herhangi bir veritabanı bağlantısı kullanılmamış** ("without database yet"), tüm veri modeli ve CRUD operasyonları tip güvenli biçimde **In-Memory (Bellek İçi)** olarak kurgulanmıştır.
 
@@ -187,10 +190,29 @@ npm test
 
 ---
 
-## 🐳 Docker ile Başlatma
+---
+
+## 🐳 Docker ile Başlatma ve Veri Kalıcılığı ("The Forgetting Test")
+
+Sistem, çoklu konteyner mimarisini yönetmek ve veritabanı kalıcılığını sağlamak için `docker-compose.yml` kullanır:
 
 ```bash
-docker compose up --build
+# 1. Konteynerleri inşa et ve başlat
+docker compose up --build -d
+
+# 2. Veritabanı tablolarını göç et (Migration)
+docker compose exec server npx prisma migrate deploy
+
+# 3. Başlangıç verilerini (Seed) yükle
+docker compose exec server npm run prisma:seed
 ```
-- Frontend (Next.js): `http://localhost:3000`
-- Backend API & MVC: `http://localhost:5001`
+
+### 🧪 "The Forgetting Test" Doğrulama Adımları:
+1. **Kayıt Oluştur:** [http://localhost:5001/users](http://localhost:5001/users) veya `/api/users` üzerinden yeni bir mezun kaydı ekleyin.
+2. **Konteynerleri Kapat:** `docker compose down` komutunu çalıştırın. (Konteynerler ve ağ durdurulur; ancak `alumni_tracking_postgres_data` hacmi korunur).
+3. **Konteynerleri Yeniden Başlat:** `docker compose up -d` komutu ile tekrar ayağa kaldırın.
+4. **Kayıt Kontrolü:** [http://localhost:5001/users](http://localhost:5001/users) adresini açtığınızda oluşturduğunuz kaydın silinmediğini ve eksiksiz durduğunu doğrulayın.
+
+---
+
+> 📖 **Veri Modeli Detayları:** Tablolar ve ilişkiler için ➡️ [ddd.md](./ddd.md) dokümanını inceleyebilirsiniz.

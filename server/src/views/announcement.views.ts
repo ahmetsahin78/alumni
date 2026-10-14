@@ -29,9 +29,9 @@ export class AnnouncementViews {
               <div class="card-header" style="background: #fafafa;">
                 <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
                   <span class="badge ${
-                    a.priority === "High"
+                    String(a.priority).toUpperCase() === "HIGH"
                       ? "badge-danger"
-                      : a.priority === "Medium"
+                      : String(a.priority).toUpperCase() === "MEDIUM"
                       ? "badge-warning"
                       : "badge-neutral"
                   }">${a.priority} Öncelik</span>
@@ -138,9 +138,9 @@ export class AnnouncementViews {
         <div class="card-header" style="background: #f8fafc;">
           <div style="display: flex; align-items: center; gap: 0.65rem;">
             <span class="badge ${
-              announcement.priority === "High"
+              String(announcement.priority).toUpperCase() === "HIGH"
                 ? "badge-danger"
-                : announcement.priority === "Medium"
+                : String(announcement.priority).toUpperCase() === "MEDIUM"
                 ? "badge-warning"
                 : "badge-neutral"
             }">${announcement.priority} Öncelik</span>
@@ -278,20 +278,20 @@ export class AnnouncementViews {
               <div class="form-group">
                 <label class="form-label" for="category">Kategori</label>
                 <select id="category" name="category" class="form-control">
-                  <option value="General" ${announcement.category === "General" ? "selected" : ""}>Genel</option>
-                  <option value="Event" ${announcement.category === "Event" ? "selected" : ""}>Etkinlik</option>
-                  <option value="Career" ${announcement.category === "Career" ? "selected" : ""}>Kariyer</option>
-                  <option value="Academic" ${announcement.category === "Academic" ? "selected" : ""}>Akademik</option>
-                  <option value="Urgent" ${announcement.category === "Urgent" ? "selected" : ""}>Acil</option>
+                  <option value="General" ${String(announcement.category).toUpperCase() === "GENERAL" ? "selected" : ""}>Genel</option>
+                  <option value="Event" ${String(announcement.category).toUpperCase() === "EVENT" ? "selected" : ""}>Etkinlik</option>
+                  <option value="Career" ${String(announcement.category).toUpperCase() === "CAREER" ? "selected" : ""}>Kariyer</option>
+                  <option value="Academic" ${String(announcement.category).toUpperCase() === "ACADEMIC" ? "selected" : ""}>Akademik</option>
+                  <option value="Urgent" ${String(announcement.category).toUpperCase() === "URGENT" ? "selected" : ""}>Acil</option>
                 </select>
               </div>
 
               <div class="form-group">
                 <label class="form-label" for="priority">Öncelik Derecesi</label>
                 <select id="priority" name="priority" class="form-control">
-                  <option value="Low" ${announcement.priority === "Low" ? "selected" : ""}>Düşük (Low)</option>
-                  <option value="Medium" ${announcement.priority === "Medium" ? "selected" : ""}>Orta (Medium)</option>
-                  <option value="High" ${announcement.priority === "High" ? "selected" : ""}>Yüksek (High)</option>
+                  <option value="Low" ${String(announcement.priority).toUpperCase() === "LOW" ? "selected" : ""}>Düşük (Low)</option>
+                  <option value="Medium" ${String(announcement.priority).toUpperCase() === "MEDIUM" ? "selected" : ""}>Orta (Medium)</option>
+                  <option value="High" ${String(announcement.priority).toUpperCase() === "HIGH" ? "selected" : ""}>Yüksek (High)</option>
                 </select>
               </div>
             </div>
@@ -312,3 +312,4 @@ export class AnnouncementViews {
     });
   }
 }
+

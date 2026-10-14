@@ -1,10 +1,10 @@
 /**
  * ============================================================================
- * AnnouncementController (MVC View Controller)
+ * AnnouncementController (MVC View Controller - Database Persistence)
  * ============================================================================
  * İstanbul Üniversitesi Web Programlama Dersi - Hafta 04: Ödev Görevleri (Homework)
  * Görev: Duyurular için View controller'ı oluştur ve kullanıcıların tarayıcı
- * üzerinden duyuruları yönetmesini sağlayan arayüz operasyonlarını bağla.
+ * üzerinden doğrudan PostgreSQL veritabanı ile duyuruları yönetmesini sağla.
  * ============================================================================
  */
 
@@ -16,12 +16,12 @@ export class AnnouncementController {
   /**
    * 1. GET /announcements -> Duyuruları Listele (Yönetim Arayüzü)
    */
-  public static index(req: Request, res: Response): void {
+  public static async index(req: Request, res: Response): Promise<void> {
     const search = req.query.search as string | undefined;
     const category = req.query.category as string | undefined;
     const alertMessage = req.query.msg as string | undefined;
 
-    const announcements = announcementModel.findAll({ search, category });
+    const announcements = await announcementModel.findAll({ search, category });
     const html = AnnouncementViews.renderList(announcements, { search, category }, alertMessage);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.status(200).send(html);
@@ -39,7 +39,7 @@ export class AnnouncementController {
   /**
    * 3. POST /announcements -> Yeni Duyuru Yayınla (Create)
    */
-  public static create(req: Request, res: Response): void {
+  public static async create(req: Request, res: Response): Promise<void> {
     const { title, content, author, category, priority } = req.body;
 
     if (!title || !content || !author) {
@@ -51,12 +51,12 @@ export class AnnouncementController {
       return;
     }
 
-    const newAnnouncement = announcementModel.create({
+    const newAnnouncement = await announcementModel.create({
       title,
       content,
       author,
-      category: (category as AnnouncementCategory) || "General",
-      priority: (priority as AnnouncementPriority) || "Medium",
+      category: (category as AnnouncementCategory) || "GENERAL",
+      priority: (priority as AnnouncementPriority) || "MEDIUM",
     });
 
     res.redirect(
@@ -67,18 +67,19 @@ export class AnnouncementController {
   /**
    * 4. GET /announcements/:id -> Tekil Duyuru Detayı (Read - One)
    */
-  public static show(req: Request, res: Response): void {
+  public static async show(req: Request, res: Response): Promise<void> {
     const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) {
       res.redirect("/announcements");
       return;
     }
 
-    const announcement = announcementModel.findById(id);
+    const announcement = await announcementModel.findById(id);
     if (!announcement) {
+      const allAnnouncements = await announcementModel.findAll();
       res.status(404).send(
         AnnouncementViews.renderList(
-          announcementModel.findAll(),
+          allAnnouncements,
           {},
           `#${id} numaralı duyuru bulunamadı.`
         )
@@ -94,14 +95,14 @@ export class AnnouncementController {
   /**
    * 5. GET /announcements/:id/edit -> Duyuru Düzenleme Formu
    */
-  public static editForm(req: Request, res: Response): void {
+  public static async editForm(req: Request, res: Response): Promise<void> {
     const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) {
       res.redirect("/announcements");
       return;
     }
 
-    const announcement = announcementModel.findById(id);
+    const announcement = await announcementModel.findById(id);
     if (!announcement) {
       res.redirect("/announcements");
       return;
@@ -115,7 +116,7 @@ export class AnnouncementController {
   /**
    * 6. POST /announcements/:id/edit (veya POST /announcements/:id) -> Duyuru Güncelle (Update)
    */
-  public static update(req: Request, res: Response): void {
+  public static async update(req: Request, res: Response): Promise<void> {
     const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) {
       res.redirect("/announcements");
@@ -125,7 +126,7 @@ export class AnnouncementController {
     const { title, content, author, category, priority } = req.body;
 
     if (!title || !content || !author) {
-      const existing = announcementModel.findById(id);
+      const existing = await announcementModel.findById(id);
       if (!existing) {
         res.redirect("/announcements");
         return;
@@ -138,12 +139,12 @@ export class AnnouncementController {
       return;
     }
 
-    const updated = announcementModel.replace(id, {
+    const updated = await announcementModel.replace(id, {
       title,
       content,
       author,
-      category: (category as AnnouncementCategory) || "General",
-      priority: (priority as AnnouncementPriority) || "Medium",
+      category: (category as AnnouncementCategory) || "GENERAL",
+      priority: (priority as AnnouncementPriority) || "MEDIUM",
     });
 
     if (!updated) {
@@ -157,10 +158,10 @@ export class AnnouncementController {
   /**
    * 7. POST /announcements/:id/delete -> Duyuru Sil (Delete)
    */
-  public static delete(req: Request, res: Response): void {
+  public static async delete(req: Request, res: Response): Promise<void> {
     const id = parseInt(req.params.id as string, 10);
     if (!isNaN(id)) {
-      const deleted = announcementModel.delete(id);
+      const deleted = await announcementModel.delete(id);
       const msg = deleted
         ? `"${deleted.title}" başlıklı duyuru silindi.`
         : "Silinecek duyuru bulunamadı.";

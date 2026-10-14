@@ -32,3 +32,4 @@ router.patch("/:id", ApiUserController.patchUser);
 router.delete("/:id", ApiUserController.deleteUser);
 
 export default router;
+

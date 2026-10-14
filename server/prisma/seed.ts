@@ -1,12 +1,25 @@
-import { PrismaClient, Role, JobType, RSVPStatus, MentorshipStatus } from "@prisma/client";
+/**
+ * ============================================================================
+ * Database Seeder (Prisma ORM)
+ * ============================================================================
+ * Alumni Tracking System veritabanını test ve geliştirme ortamları için
+ * gerçekçi verilerle (Seed) doldurur.
+ * ============================================================================
+ */
+
+import { PrismaClient, Role, JobType, RSVPStatus, MentorshipStatus, AnnouncementCategory, AnnouncementPriority } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { UserFactory } from "../src/database/factories/user.factory";
+import { AnnouncementFactory } from "../src/database/factories/announcement.factory";
+import { AlumniFactory } from "../src/database/factories/alumni.factory";
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("🌱 Starting database seed...");
 
-  // Clean existing data
+  // 1. Clean existing records in correct foreign key order
+  console.log("🧹 Cleaning old records...");
   await prisma.eventRSVP.deleteMany();
   await prisma.event.deleteMany();
   await prisma.jobPosting.deleteMany();
@@ -16,17 +29,23 @@ async function main() {
   await prisma.workExperience.deleteMany();
   await prisma.academicHistory.deleteMany();
   await prisma.profile.deleteMany();
+  await prisma.announcement.deleteMany();
+  await prisma.alumnus.deleteMany();
   await prisma.user.deleteMany();
 
   const passwordHash = await bcrypt.hash("Password123!", 10);
 
-  // 1. Create Admin User
+  // 2. Create Core Admin & Faculty Users
+  console.log("👤 Creating Admin & Faculty users...");
   const admin = await prisma.user.create({
     data: {
       email: "admin@istanbul.edu.tr",
+      name: "Sistem Yöneticisi",
       passwordHash,
       role: Role.ADMIN,
       isVerified: true,
+      department: "Rektörlük",
+      company: "İstanbul Üniversitesi",
       profile: {
         create: {
           firstName: "Sistem",
@@ -39,24 +58,62 @@ async function main() {
     },
   });
 
-  // 2. Create Alumni Users
-  const alumni1 = await prisma.user.create({
+  const faculty = await prisma.user.create({
     data: {
-      email: "alumni.ahmet@example.com",
+      email: "emre.akadal@istanbul.edu.tr",
+      name: "Prof. Dr. Emre Akadal",
       passwordHash,
-      role: Role.ALUMNI,
+      role: Role.FACULTY,
+      graduationYear: 2008,
+      department: "Yönetim Bilişim Sistemleri",
+      company: "İstanbul Üniversitesi",
       isVerified: true,
       profile: {
         create: {
-          firstName: "Ahmet",
-          lastName: "Yılmaz",
-          headline: "Senior Software Engineer @ TechCorp",
-          bio: "İ.Ü. Bilgisayar Mühendisliği 2020 mezunuyum. Cloud computing, Distributed Systems ve Node.js/Go konularında çalışıyorum.",
+          firstName: "Emre",
+          lastName: "Akadal",
+          headline: "Öğretim Üyesi @ İstanbul Üniversitesi",
+          bio: "Web Programlama ve Veritabanı Sistemleri",
           location: "İstanbul, Türkiye",
-          linkedinUrl: "https://linkedin.com/in/example-ahmet",
-          githubUrl: "https://github.com/example-ahmet",
           isMentor: true,
-          mentorshipTopics: "Kariyer Tavsiyesi, Backend Geliştirme, Yurt Dışı İş İmkanları",
+        },
+      },
+      academicHistories: {
+        create: {
+          university: "İstanbul Üniversitesi",
+          faculty: "İktisat Fakültesi",
+          department: "Yönetim Bilişim Sistemleri",
+          degree: "Doktora",
+          startYear: 2004,
+          graduationYear: 2008,
+        },
+      },
+    },
+  });
+
+  // 3. Create Key Alumni Users (Matches Week 03 & 04 in-memory data)
+  console.log("🎓 Creating Core Alumni users...");
+  const alumni1 = await prisma.user.create({
+    data: {
+      email: "elif.kaya@istanbul.edu.tr",
+      name: "Elif Kaya",
+      passwordHash,
+      role: Role.ALUMNI,
+      graduationYear: 2024,
+      department: "Bilgisayar Mühendisliği",
+      company: "Google",
+      isVerified: true,
+      profile: {
+        create: {
+          firstName: "Elif",
+          lastName: "Kaya",
+          headline: "Software Engineer @ Google",
+          bio: "İ.Ü. Bilgisayar Mühendisliği 2024 mezunuyum. Cloud computing, Distributed Systems konularında çalışıyorum.",
+          location: "Zürih, İsviçre",
+          linkedinUrl: "https://linkedin.com/in/elif-kaya-demo",
+          githubUrl: "https://github.com/elif-kaya-demo",
+          isMentor: true,
+          mentorshipTopics: "Kariyer Tavsiyesi, Cloud Architecture, Global İş Başvuruları",
         },
       },
       academicHistories: {
@@ -65,52 +122,89 @@ async function main() {
           faculty: "Mühendislik Fakültesi",
           department: "Bilgisayar Mühendisliği",
           degree: "Lisans",
-          startYear: 2016,
-          graduationYear: 2020,
+          startYear: 2020,
+          graduationYear: 2024,
         },
       },
       workExperiences: {
-        create: [
-          {
-            company: "TechCorp",
-            position: "Senior Software Engineer",
-            industry: "Teknoloji / Yazılım",
-            location: "İstanbul",
-            startDate: new Date("2022-01-01"),
-            isCurrent: true,
-            description: "Mikroservis mimarileri ve yüksek ölçekli sistemlerin geliştirilmesi.",
-          },
-          {
-            company: "StartupLab",
-            position: "Full Stack Developer",
-            industry: "Teknoloji",
-            location: "İstanbul",
-            startDate: new Date("2020-07-01"),
-            endDate: new Date("2021-12-31"),
-            isCurrent: false,
-            description: "React ve Node.js ile SaaS ürün geliştirme.",
-          },
-        ],
+        create: {
+          company: "Google",
+          position: "Software Engineer",
+          industry: "Teknoloji / Yazılım",
+          location: "Zürih / Hibrit",
+          startDate: new Date("2024-07-01"),
+          isCurrent: true,
+          description: "Google Cloud Platform altyapı servisleri geliştirme.",
+        },
       },
     },
   });
 
   const alumni2 = await prisma.user.create({
     data: {
-      email: "alumni.zeynep@example.com",
+      email: "mert.aydin@istanbul.edu.tr",
+      name: "Mert Aydın",
       passwordHash,
       role: Role.ALUMNI,
+      graduationYear: 2021,
+      department: "Endüstri Mühendisliği",
+      company: "Microsoft",
+      isVerified: true,
+      profile: {
+        create: {
+          firstName: "Mert",
+          lastName: "Aydın",
+          headline: "Product Manager @ Microsoft",
+          bio: "2021 Endüstri Mühendisliği mezunu. Ürün yönetimi ve veri odaklı büyüme.",
+          location: "İstanbul, Türkiye",
+          linkedinUrl: "https://linkedin.com/in/mert-aydin-demo",
+          isMentor: true,
+          mentorshipTopics: "Product Management, Agile, Tech Career",
+        },
+      },
+      academicHistories: {
+        create: {
+          university: "İstanbul Üniversitesi",
+          faculty: "Mühendislik Fakültesi",
+          department: "Endüstri Mühendisliği",
+          degree: "Lisans",
+          startYear: 2017,
+          graduationYear: 2021,
+        },
+      },
+      workExperiences: {
+        create: {
+          company: "Microsoft",
+          position: "Product Manager",
+          industry: "Teknoloji",
+          location: "İstanbul",
+          startDate: new Date("2021-09-01"),
+          isCurrent: true,
+          description: "Enterprise çözümler için ürün stratejisi ve roadmap yönetimi.",
+        },
+      },
+    },
+  });
+
+  const alumni3 = await prisma.user.create({
+    data: {
+      email: "zeynep.arslan@istanbul.edu.tr",
+      name: "Zeynep Arslan",
+      passwordHash,
+      role: Role.ALUMNI,
+      graduationYear: 2019,
+      department: "İktisat",
+      company: "FinScale",
       isVerified: true,
       profile: {
         create: {
           firstName: "Zeynep",
-          lastName: "Kaya",
-          headline: "Product Manager @ FinScale",
-          bio: "İktisat 2018 mezunu. FinTech alanında ürün yönetimi yapıyorum.",
+          lastName: "Arslan",
+          headline: "Lead Analyst @ FinScale",
+          bio: "İktisat 2019 mezunu. FinTech ve finansal analiz uzmanı.",
           location: "Londra, Birleşik Krallık",
-          linkedinUrl: "https://linkedin.com/in/example-zeynep",
+          linkedinUrl: "https://linkedin.com/in/zeynep-arslan-demo",
           isMentor: true,
-          mentorshipTopics: "Product Management, FinTech, Kariyer Geçişi",
         },
       },
       academicHistories: {
@@ -119,37 +213,29 @@ async function main() {
           faculty: "İktisat Fakültesi",
           department: "İktisat",
           degree: "Lisans",
-          startYear: 2014,
-          graduationYear: 2018,
-        },
-      },
-      workExperiences: {
-        create: {
-          company: "FinScale",
-          position: "Lead Product Manager",
-          industry: "Finans / FinTech",
-          location: "Londra",
-          startDate: new Date("2021-03-01"),
-          isCurrent: true,
-          description: "Kullanıcı deneyimi odaklı finansal ürünler geliştirme.",
+          startYear: 2015,
+          graduationYear: 2019,
         },
       },
     },
   });
 
-  // 3. Create Student User
-  const student1 = await prisma.user.create({
+  const student = await prisma.user.create({
     data: {
-      email: "student.can@istanbul.edu.tr",
+      email: "can.ozturk@istanbul.edu.tr",
+      name: "Can Öztürk",
       passwordHash,
       role: Role.STUDENT,
+      graduationYear: 2025,
+      department: "Yazılım Mühendisliği",
+      company: "Trendyol Stajyer",
       isVerified: true,
       profile: {
         create: {
           firstName: "Can",
           lastName: "Öztürk",
-          headline: "3. Sınıf Bilgisayar Mühendisliği Öğrencisi",
-          bio: "Web geliştirme ve yapay zeka alanlarına ilgi duyuyorum. Mentorluk arayışındayım.",
+          headline: "3. Sınıf Yazılım Mühendisliği Öğrencisi",
+          bio: "Web geliştirme ve açık kaynak projelere ilgi duyuyorum.",
           location: "İstanbul, Türkiye",
         },
       },
@@ -157,42 +243,113 @@ async function main() {
         create: {
           university: "İstanbul Üniversitesi",
           faculty: "Mühendislik Fakültesi",
-          department: "Bilgisayar Mühendisliği",
+          department: "Yazılım Mühendisliği",
           degree: "Lisans",
-          startYear: 2023,
-          graduationYear: 2027,
+          startYear: 2021,
+          graduationYear: 2025,
         },
       },
     },
   });
 
-  // 4. Create Skills
-  const skillNames = ["Node.js", "React", "TypeScript", "PostgreSQL", "Docker", "Product Management", "Python", "AWS"];
+  // 4. Generate Additional Users with UserFactory
+  console.log("🏭 Generating realistic users via UserFactory...");
+  const factoryUsers = UserFactory.buildMany(6);
+  for (const fUser of factoryUsers) {
+    await prisma.user.create({
+      data: {
+        name: fUser.name,
+        email: fUser.email,
+        role: fUser.role,
+        graduationYear: fUser.graduationYear,
+        department: fUser.department,
+        company: fUser.company,
+        isVerified: fUser.isVerified,
+        avatarUrl: fUser.avatarUrl,
+        passwordHash,
+      },
+    });
+  }
+
+  // 5. Seed Skills
+  console.log("💡 Seeding Skills catalog...");
+  const skillNames = ["Node.js", "React", "TypeScript", "PostgreSQL", "Docker", "Product Management", "Python", "AWS", "Prisma ORM", "Microservices"];
   for (const name of skillNames) {
     const skill = await prisma.skill.create({ data: { name } });
-    if (["Node.js", "TypeScript", "Docker", "PostgreSQL"].includes(name)) {
+    if (["Node.js", "TypeScript", "PostgreSQL", "Docker"].includes(name)) {
       await prisma.userSkill.create({
         data: { userId: alumni1.id, skillId: skill.id },
       });
     }
   }
 
-  // 5. Create Job Posting
+  // 6. Seed Announcements via AnnouncementFactory
+  console.log("📢 Seeding Announcements...");
+  const sampleAnnouncements = [
+    {
+      title: "2026 Mezunlar Buluşması ve Kariyer Günü",
+      content: "Tüm mezunlarımız ve son sınıf öğrencilerimiz için geleneksel Beyazıt Kampüsü Mezunlar Buluşması 15 Mayıs'ta gerçekleşecektir. Kayıt yaptırmayı unutmayınız.",
+      author: "Mezunlar Ofisi Koordinatörlüğü",
+      category: AnnouncementCategory.EVENT,
+      priority: AnnouncementPriority.HIGH,
+      authorUserId: admin.id,
+    },
+    {
+      title: "Google & Microsoft Mentorluk Programı Başvuruları Başladı",
+      content: "Sektörde çalışan deneyimli mezunlarımız ile öğrencilerimizi buluşturan 6 aylık mentorluk programı başvuruları açılmıştır.",
+      author: "Kariyer Geliştirme Merkezi",
+      category: AnnouncementCategory.CAREER,
+      priority: AnnouncementPriority.HIGH,
+      authorUserId: admin.id,
+    },
+    {
+      title: "Web Programlama Dersi Veritabanı Kalıcılığı Proje Teslimleri",
+      content: "Docker Compose, PostgreSQL kalıcı hacmi ve Prisma ORM migration adımları eksiksiz tamamlanmalıdır.",
+      author: "Prof. Dr. Emre Akadal",
+      category: AnnouncementCategory.ACADEMIC,
+      priority: AnnouncementPriority.MEDIUM,
+      authorUserId: faculty.id,
+    },
+    {
+      title: "Kütüphane Veritabanı ve Uzaktan Erişim Bakım Duyurusu",
+      content: "Hafta sonu kütüphane dijital portalında planlı bakım çalışması yapılacaktır. Bilgilerinize sunulur.",
+      author: "Bilgi İşlem Daire Başkanlığı",
+      category: AnnouncementCategory.GENERAL,
+      priority: AnnouncementPriority.LOW,
+      authorUserId: admin.id,
+    },
+  ];
+
+  for (const ann of sampleAnnouncements) {
+    await prisma.announcement.create({ data: ann });
+  }
+
+  // 7. Seed Alumni Records Table (Week 03 table compatibility)
+  console.log("📜 Seeding Alumni Records (Week 03 table)...");
+  const seedAlumni = AlumniFactory.buildMany(4);
+  for (const item of seedAlumni) {
+    await prisma.alumnus.create({ data: item });
+  }
+
+  // 8. Seed Job Postings
+  console.log("💼 Seeding Job Postings...");
   await prisma.jobPosting.create({
     data: {
       authorId: alumni1.id,
       title: "Junior Backend Developer",
-      company: "TechCorp",
+      company: "Google Cloud Partner / TechCorp",
       location: "İstanbul (Hibrit)",
       type: JobType.FULL_TIME,
       industry: "Teknoloji",
       description: "Ekibimize katılacak hevesli Junior Backend Geliştirici arıyoruz. Node.js ve SQL deneyimi olan mezunlar önceliklidir.",
-      requirements: "Node.js/TypeScript temeli, REST API kavramları, Git bilgisi.",
-      applicationUrl: "https://techcorp.example/careers",
+      requirements: "Node.js/TypeScript temeli, REST API kavramları, PostgreSQL ve Git bilgisi.",
+      applicationUrl: "https://careers.google.com",
+      salaryRange: "45.000 - 65.000 TL",
     },
   });
 
-  // 6. Create Event
+  // 9. Seed Events & RSVP
+  console.log("📅 Seeding Events & RSVPs...");
   const reunionEvent = await prisma.event.create({
     data: {
       organizerId: admin.id,
@@ -205,7 +362,6 @@ async function main() {
     },
   });
 
-  // 7. RSVP
   await prisma.eventRSVP.create({
     data: {
       eventId: reunionEvent.id,
@@ -214,19 +370,27 @@ async function main() {
     },
   });
 
-  // 8. Mentorship Request
+  // 10. Seed Mentorship Request
+  console.log("🤝 Seeding Mentorship Request...");
   await prisma.mentorshipRequest.create({
     data: {
       mentorId: alumni1.id,
-      menteeId: student1.id,
+      menteeId: student.id,
       status: MentorshipStatus.ACCEPTED,
-      message: "Merhaba Ahmet Abi, ben 3. sınıf öğrencisiyim. Backend geliştirme ve kariyer adımları hakkında rehberliğinizi rica ediyorum.",
+      message: "Merhaba Elif Hanım, ben 3. sınıf öğrencisiyim. Bulut bilişim ve backend mimarileri hakkında tavsiyelerinizi rica ediyorum.",
       meetingUrl: "https://meet.google.com/abc-defg-hij",
       notes: "Haftalık periyodik görüşme ayarlandı.",
     },
   });
 
+  console.log("\n=======================================================");
   console.log("✅ Seed completed successfully!");
+  console.log("   - Users created:", await prisma.user.count());
+  console.log("   - Announcements created:", await prisma.announcement.count());
+  console.log("   - Alumni records created:", await prisma.alumnus.count());
+  console.log("   - Job postings created:", await prisma.jobPosting.count());
+  console.log("   - Events created:", await prisma.event.count());
+  console.log("=======================================================\n");
 }
 
 main()

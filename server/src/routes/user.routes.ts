@@ -35,3 +35,4 @@ router.post("/:id/delete", UserController.delete);
 router.get("/:id/delete", UserController.delete);
 
 export default router;
+

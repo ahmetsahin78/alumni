@@ -1,4 +1,13 @@
+# ==============================================================================
+# Alumni Tracking System - Docker Compose Configuration
+# Multi-container setup: PostgreSQL, Express Backend, Next.js Frontend
+# Includes persistent volume configuration for "The Forgetting Test"
+# ==============================================================================
+
 services:
+  # ----------------------------------------------------------------------------
+  # 1. PostgreSQL Database Service
+  # ----------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
     container_name: alumni_postgres
@@ -9,14 +18,21 @@ services:
       POSTGRES_DB: ${DB_NAME:-alumni_db}
     ports:
       - "${DB_PORT:-5432}:5432"
+    # CRITICAL: Persistent Docker Volume for "The Forgetting Test"
+    # Ensures database records persist across `docker compose down` and `docker compose up`
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-alumni_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - alumni_network
 
+  # ----------------------------------------------------------------------------
+  # 2. Backend Server (Node.js + Express + TypeScript + Prisma)
+  # ----------------------------------------------------------------------------
   server:
     build:
       context: ./server
@@ -26,8 +42,13 @@ services:
     ports:
       - "${PORT:-5001}:5001"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=5001
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_NAME=${DB_NAME:-alumni_db}
+      - DB_HOST=postgres
+      - DB_PORT=5432
       - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-alumni_db}?schema=public
       - JWT_SECRET=${JWT_SECRET:-super_secret_alumni_tracking_jwt_key_2026}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
@@ -39,7 +60,12 @@ services:
       - ./server:/app
       - /app/node_modules
     command: npm run dev
+    networks:
+      - alumni_network
 
+  # ----------------------------------------------------------------------------
+  # 3. Frontend Client (Next.js 14+ + React + TypeScript + Tailwind)
+  # ----------------------------------------------------------------------------
   client:
     build:
       context: ./client
@@ -49,7 +75,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=${NODE_ENV:-development}
       - NEXT_PUBLIC_API_URL=http://localhost:5001/api
     depends_on:
       - server
@@ -58,7 +84,21 @@ services:
       - /app/node_modules
       - /app/.next
     command: npm run dev
+    networks:
+      - alumni_network
 
+# ------------------------------------------------------------------------------
+# Persistent Docker Volumes
+# ------------------------------------------------------------------------------
 volumes:
-  pgdata:
+  postgres_data:
+    name: alumni_tracking_postgres_data
     driver: local
+
+# ------------------------------------------------------------------------------
+# Bridge Network
+# ------------------------------------------------------------------------------
+networks:
+  alumni_network:
+    name: alumni_tracking_network
+    driver: bridge

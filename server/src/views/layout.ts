@@ -350,3 +350,4 @@ export function renderLayout(content: string, options: LayoutOptions): string {
 </body>
 </html>`;
 }
+

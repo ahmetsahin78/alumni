@@ -7,10 +7,15 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// -----------------------------------------------------------------------------
+// ENUMS
+// -----------------------------------------------------------------------------
+
 enum Role {
   STUDENT
   ALUMNI
   ADMIN
+  FACULTY
 }
 
 enum MentorshipStatus {
@@ -34,26 +39,51 @@ enum RSVPStatus {
   DECLINED
 }
 
+enum AnnouncementCategory {
+  GENERAL
+  EVENT
+  CAREER
+  ACADEMIC
+  URGENT
+}
+
+enum AnnouncementPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// -----------------------------------------------------------------------------
+// MODELS
+// -----------------------------------------------------------------------------
+
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
-  role         Role     @default(STUDENT)
-  isVerified   Boolean  @default(false)
-  avatarUrl    String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String    @id @default(uuid())
+  email          String    @unique
+  passwordHash   String    @default("$2a$10$wT0dYwWfx9.pZ5pD7QhL1.K5nK2O5m3z9ZJ8YnU.k5a8wYy.nB1e.")
+  name           String?
+  role           Role      @default(STUDENT)
+  graduationYear Int?
+  department     String?
+  company        String?
+  isVerified     Boolean   @default(false)
+  avatarUrl      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  profile              Profile?
-  academicHistories    AcademicHistory[]
-  workExperiences      WorkExperience[]
-  skills               UserSkill[]
-  mentorshipsAsMentor  MentorshipRequest[] @relation("MentorRequests")
-  mentorshipsAsMentee  MentorshipRequest[] @relation("MenteeRequests")
-  jobPostings          JobPosting[]
-  eventsOrganized      Event[]             @relation("OrganizedEvents")
-  eventRSVPs           EventRSVP[]
+  profile             Profile?
+  academicHistories   AcademicHistory[]
+  workExperiences     WorkExperience[]
+  skills              UserSkill[]
+  mentorshipsAsMentor MentorshipRequest[] @relation("MentorRequests")
+  mentorshipsAsMentee MentorshipRequest[] @relation("MenteeRequests")
+  jobPostings         JobPosting[]
+  eventsOrganized     Event[]             @relation("OrganizedEvents")
+  eventRSVPs          EventRSVP[]
+  announcements       Announcement[]
 
+  @@index([graduationYear])
+  @@index([department])
   @@map("users")
 }
 
@@ -70,7 +100,7 @@ model Profile {
   githubUrl        String?
   websiteUrl       String?
   isMentor         Boolean  @default(false)
-  mentorshipTopics String?  // comma-separated or JSON
+  mentorshipTopics String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -82,10 +112,10 @@ model Profile {
 model AcademicHistory {
   id             String   @id @default(uuid())
   userId         String
-  university     String   @default("Istanbul University")
+  university     String   @default("İstanbul Üniversitesi")
   faculty        String
   department     String
-  degree         String   @default("Bachelor")
+  degree         String   @default("Lisans")
   startYear      Int
   graduationYear Int
   createdAt      DateTime @default(now())
@@ -120,9 +150,10 @@ model WorkExperience {
 }
 
 model Skill {
-  id    String      @id @default(uuid())
-  name  String      @unique
-  users UserSkill[]
+  id        String      @id @default(uuid())
+  name      String      @unique
+  createdAt DateTime    @default(now())
+  users     UserSkill[]
 
   @@map("skills")
 }
@@ -211,4 +242,39 @@ model EventRSVP {
 
   @@unique([eventId, userId])
   @@map("event_rsvps")
+}
+
+model Announcement {
+  id           Int                  @id @default(autoincrement())
+  title        String
+  content      String
+  author       String
+  category     AnnouncementCategory @default(GENERAL)
+  priority     AnnouncementPriority @default(MEDIUM)
+  publishedAt  DateTime             @default(now())
+  authorUserId String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  authorUser User? @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([category])
+  @@index([priority])
+  @@map("announcements")
+}
+
+model Alumnus {
+  id             Int      @id @default(autoincrement())
+  name           String
+  email          String?
+  graduationYear Int
+  department     String?
+  company        String?
+  role           String?  @default("Software Engineer")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([graduationYear])
+  @@index([department])
+  @@map("alumni_records")
 }
