@@ -152,15 +152,17 @@ alumni-tracking-system/
 | **PATCH** | `/api/announcements/:id` | REST API | Duyuruyu kısmi olarak günceller |
 | **DELETE** | `/api/announcements/:id` | REST API | Duyuruyu siler |
 
-### 3. Sistem & Dokümantasyon Uç Noktaları
+### 3. Sistem & Ders İçi Temel Uç Noktalar (Whiteboard Rotaları)
 
-| HTTP Metodu | Rota / URL | Açıklama |
-| :--- | :--- | :--- |
-| **GET** | `/api/swagger` (veya `/api-docs`) | Swagger UI Etkileşimli API Dokümantasyonu |
-| **GET** | `/api/swagger.json` | OpenAPI 3.0 Ham JSON Spesifikasyonu |
-| **GET** | `/api/health` | Sunucu sağlık durumu (Uptime, RAM, CPU) |
-| **GET** | `/hello/:name` | Ders içi yardımcı selamlama fonksiyonu |
-| **GET** | `/sum/:n1/:n2` | Ders içi iki sayı toplama fonksiyonu |
+| HTTP Metodu | Rota / URL | Açıklama | Beklenen Yanıt Örneği |
+| :--- | :--- | :--- | :--- |
+| **GET** | `/` | Temel kök kontrol yanıtı | `"ok"` |
+| **GET** | `/hello` | Statik karşılama mesajı | `"Hello, World!"` |
+| **GET** | `/hello/:name` (veya `/hello/{name}`) | Dinamik karşılama mesajı | `/hello/emre` ➡️ `"Hello, Emre!"` |
+| **GET** | `/sum/:number1/:number2` | İki sayıyı toplama rotası | `/sum/15/27` ➡️ `"42"` |
+| **GET** | `/api/swagger` (veya `/api-docs`) | Swagger UI Etkileşimli API Dokümantasyonu | HTML Arayüzü |
+| **GET** | `/api/swagger.json` | OpenAPI 3.0 Ham JSON Spesifikasyonu | JSON |
+| **GET** | `/api/health` | Sunucu sağlık durumu (Uptime, RAM, CPU) | JSON |
 
 ---
 
@@ -189,6 +191,21 @@ npm test
 ```
 
 ---
+
+## 🔐 Ortam Değişkenleri (Environment Variables)
+
+Projede veritabanı bağlantı bilgileri, portlar ve uygulama sırları `.env` dosyası üzerinden okunur:
+- **Gizlilik & Git:** `.env` dosyası `.gitignore` içinde tanımlanmış olup versiyon kontrolüne kesinlikle dahil edilmez.
+- **Şablon Dosyaları:** Yeni geliştiriciler ve kurulumlar için hassas bilgi içermeyen `.env.example` ve `.example.env` şablonları hem kök dizinde hem de `server/` altında sunulmuştur:
+  ```bash
+  # Kök dizinde:
+  cp .env.example .env
+  # veya
+  cp .example.env .env
+
+  # server dizininde:
+  cp server/.env.example server/.env
+  ```
 
 ---
 

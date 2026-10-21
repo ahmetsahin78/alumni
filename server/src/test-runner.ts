@@ -316,14 +316,28 @@ async function runCourseAssignmentTests() {
     assert(Boolean(swaggerJson.paths["/api/health"]), "Swagger paths include /api/health");
 
     // -------------------------------------------------------------
-    // Test 8: Utility Routes
+    // Test 8: Utility Routes (Whiteboard Tasks 1-4)
     // -------------------------------------------------------------
     console.log("\n--- 8. Utility Endpoints Tests ---");
-    const helloRes = await fetch(`${baseUrl}/hello/Emre`);
-    assert(helloRes.status === 200, "GET /hello/Emre returns HTTP 200");
-    const helloText = await helloRes.text();
-    assert(helloText === "Hello,Emre!", `GET /hello/Emre response is 'Hello,Emre!' (got '${helloText}')`);
+    // 8.1 GET / -> "ok"
+    const rootRes = await fetch(`${baseUrl}/`);
+    assert(rootRes.status === 200, "GET / returns HTTP 200");
+    const rootText = await rootRes.text();
+    assert(rootText === "ok", `GET / response is 'ok' (got '${rootText}')`);
 
+    // 8.2 GET /hello -> "Hello, World!"
+    const helloWorldRes = await fetch(`${baseUrl}/hello`);
+    assert(helloWorldRes.status === 200, "GET /hello returns HTTP 200");
+    const helloWorldText = await helloWorldRes.text();
+    assert(helloWorldText === "Hello, World!", `GET /hello response is 'Hello, World!' (got '${helloWorldText}')`);
+
+    // 8.3 GET /hello/emre -> "Hello, Emre!"
+    const helloRes = await fetch(`${baseUrl}/hello/emre`);
+    assert(helloRes.status === 200, "GET /hello/emre returns HTTP 200");
+    const helloText = await helloRes.text();
+    assert(helloText === "Hello, Emre!", `GET /hello/emre response is 'Hello, Emre!' (got '${helloText}')`);
+
+    // 8.4 GET /sum/15/27 -> "42"
     const sumRes = await fetch(`${baseUrl}/sum/15/27`);
     assert(sumRes.status === 200, "GET /sum/15/27 returns HTTP 200");
     const sumText = await sumRes.text();

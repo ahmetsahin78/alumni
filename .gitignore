@@ -28,6 +28,9 @@ client/.env.*
 !.env.example
 !server/.env.example
 !client/.env.example
+!.example.env
+!server/.example.env
+!client/.example.env
 
 # Logs
 npm-debug.log*

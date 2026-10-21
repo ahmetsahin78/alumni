@@ -3,17 +3,34 @@ import { Router, Request, Response } from "express";
 const router = Router();
 
 /**
- * GET /hello/:name
- * Returns greeting message: "Hello,{name}!"
+ * 1. GET / -> "ok"
+ * Ders içi temel kök rota yönergesi
  */
-router.get("/hello/:name", (req: Request, res: Response) => {
-  const { name } = req.params;
-  res.status(200).send(`Hello,${name}!`);
+router.get("/", (req: Request, res: Response) => {
+  res.status(200).send("ok");
 });
 
 /**
- * GET /sum/:number1/:number2
- * Returns sum of two numbers
+ * 2. GET /hello -> "Hello, World!"
+ * Statik selamlama rotası
+ */
+router.get("/hello", (req: Request, res: Response) => {
+  res.status(200).send("Hello, World!");
+});
+
+/**
+ * 3. GET /hello/:name -> "Hello, {name}!"
+ * Dinamik parametreli selamlama rotası (Örn: /hello/emre -> "Hello, Emre!")
+ */
+router.get("/hello/:name", (req: Request, res: Response) => {
+  const name = String(req.params.name || "");
+  const capitalized = name ? name.charAt(0).toUpperCase() + name.slice(1) : "";
+  res.status(200).send(`Hello, ${capitalized}!`);
+});
+
+/**
+ * 4. GET /sum/:number1/:number2 -> Toplam sonucu
+ * İki sayı parametresini toplayıp sonucu metin olarak döndürür
  */
 router.get("/sum/:number1/:number2", (req: Request, res: Response) => {
   const n1 = Number(req.params.number1);

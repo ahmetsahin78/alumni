@@ -28,7 +28,12 @@ app.use(cors());
 app.use(morgan(process.env.NODE_ENV === "development" ? "dev" : "combined"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(publicDir));
+// 1. GET / -> "ok" (Ders içi temel rota gereksinimi)
+app.get("/", (req: Request, res: Response) => {
+  res.status(200).send("ok");
+});
+
+app.use(express.static(publicDir, { index: false }));
 
 // Swagger UI - available at /api/swagger and /api-docs as requested
 const swaggerOptions: swaggerUi.SwaggerOptions = {
@@ -50,22 +55,6 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerOption
 app.get("/api/swagger.json", (req: Request, res: Response) => {
   res.setHeader("Content-Type", "application/json");
   res.json(swaggerSpec);
-});
-
-// GET / -> Root page (Serves index.html or helpful JSON)
-app.get("/", (req: Request, res: Response) => {
-  if (req.accepts("html")) {
-    res.sendFile(path.join(publicDir, "index.html"));
-  } else {
-    res.json({
-      name: "Alumni Tracking System API",
-      status: "running",
-      documentation: "/api/swagger",
-      healthCheck: "/api/health",
-      alumniApi: "/api/alumni",
-      usersApi: "/api/users",
-    });
-  }
 });
 
 // GET /about -> About page from course
