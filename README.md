@@ -31,7 +31,7 @@ Proje **MVC (Model-View-Controller)** desenine göre katmanlanmıştır. Hafta 0
 ### 🧱 Katmanların Rolleri ve Sorumlulukları
 
 1. **Model Katmanı (`server/src/models/`)**:
-   - **`User.model.ts`**: Kullanıcı/Mezun verilerinin (`IUser`) bellek içi koleksiyonunu yönetir. Temel CRUD metotlarını (`findAll`, `findById`, `findByEmail`, `create`, `replace`, `patch`, `delete`, `reset`) barındırır.
+   - **`User.model.ts`**: Kullanıcı/Mezun verilerini (`IUser`) Prisma üzerinden `users` tablosunda yönetir. Temel CRUD metotlarını (`findAll`, `findById`, `findByEmail`, `create`, `replace`, `patch`, `delete`, `reset`) barındırır.
    - **`Announcement.model.ts`**: Ödev görevi (Homework) kapsamında duyuruların (`IAnnouncement`) model yapısını ve CRUD işlemlerini yürütür.
    - **`JobPosting.model.ts`**: `job_postings` tablosu (kullanıcının ilanları, doğrulama, oluşturma).
    - **`Application.model.ts`**: `applications` tablosu (başvuru oluşturma, `(jobId, userId)` tekrarında `DuplicateApplicationError` → 409, iki liste).
@@ -127,7 +127,9 @@ alumni-tracking-system/
 
 > Kullanıcı id'leri UUID, ilan ve başvuru id'leri INT'tir. **Delete rule:** kullanıcı silinince ilanları ve başvuruları, ilan silinince başvuruları silinir (`ON DELETE CASCADE`, ayrıntı: [ddd.md](./ddd.md), bölüm 7b).
 
-Hızlı deneme (seed sonrası; `<USER_ID>` için `GET /api/users` çıktısından bir id alın):
+Hızlı deneme (seed sonrası; `<USER_ID>` için `GET /api/users` çıktısından bir id alın). En kolayı **Swagger** (`http://localhost:5001/api/swagger` → "Jobs & Applications" → *Try it out*). Terminalden denemek için:
+
+**macOS / Linux / Git Bash:**
 
 ```bash
 curl -X POST http://localhost:5001/api/users/<USER_ID>/jobs \
@@ -136,6 +138,17 @@ curl -X POST http://localhost:5001/api/users/<USER_ID>/jobs \
 
 curl -X POST http://localhost:5001/api/jobs/1/applications \
   -H "Content-Type: application/json" -d '{"userId":"<USER_ID>"}'   # 201, tekrar -> 409
+```
+
+**Windows PowerShell** (yukarıdaki `\` ve tek tırnaklı `curl` komutları Windows'ta çalışmaz):
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:5001/api/users/<USER_ID>/jobs `
+  -ContentType "application/json" `
+  -Body '{"title":"Stajyer","company":"Trendyol","location":"Istanbul","description":"Yaz staji"}'
+
+Invoke-RestMethod -Method Post -Uri http://localhost:5001/api/jobs/1/applications `
+  -ContentType "application/json" -Body '{"userId":"<USER_ID>"}'
 ```
 
 ### 2. Duyuru Modülü (Announcement Module - Ödev Görevleri)
@@ -213,11 +226,14 @@ cd server
 
 *Docker yoksa:* kendi PostgreSQL'inizde `alumni_db` adında bir veritabanı oluşturup `.env` içindeki `DATABASE_URL`'i ona göre güncelleyin.
 
-### 5. Migrate
+### 5. Migrate (ve Prisma Client'ı üret)
 
 ```bash
 npx prisma migrate deploy
+npx prisma generate
 ```
+
+`prisma generate`, şemadaki modellere (`Application` vb.) göre Prisma Client'ı yeniden üretir. Daha önce `npm install` yapılmış bir klasörde (ör. `git pull` sonrası) bu adım atlanırsa seed `Property 'application' does not exist` hatası verir.
 
 Bu komut `prisma/migrations/` altındaki iki migration'ı sırayla uygular: `init` ve `job_postings_applications`. Şemayı kendiniz değiştirdiğinizde yeni migration üretmek için `npm run prisma:migrate` (`prisma migrate dev`) kullanın.
 
@@ -267,7 +283,7 @@ npm run dev      # http://localhost:3000
 | `P1000: Authentication failed` | `server/.env` içindeki kullanıcı/şifre, çalışan Postgres ile uyuşmuyor. Docker kullanıyorsanız şablondaki `postgres:postgres` değerini değiştirmeyin. |
 | `P1001: Can't reach database server at localhost:5432` | Postgres çalışmıyor: `docker compose up -d postgres`. |
 | `port 5432 is already allocated` | Bilgisayarda başka bir Postgres çalışıyor. Onu durdurun ya da kök `.env`'de `DB_PORT=5433` yapıp `DATABASE_URL`'deki portu da `5433` yapın. |
-| `@prisma/client did not initialize yet` | `npx prisma generate` çalıştırın. |
+| `@prisma/client did not initialize yet` ya da `Property 'application' does not exist on type 'PrismaClient'` | Prisma Client eski şemaya göre üretilmiş: `npx prisma generate` çalıştırın. |
 | `The table "public.applications" does not exist` | Migration uygulanmamış: `npx prisma migrate deploy`. |
 
 ---
@@ -285,6 +301,8 @@ npm run dev      # http://localhost:3000
 Amaç: bir sınıf arkadaşının projeyi **sadece bu README'yi** takip ederek sıfırdan kurabilmesi (clone → install → .env → database → migrate → seed → start).
 
 - **Bulunan ilk takılma noktası:** Önceki README'de yerel kurulum sadece `npm install` + `npm run dev`'den ibaretti. `.env`, veritabanı, migrate ve seed adımları yoktu. Ayrıca `server/.env.example` şifre olarak `your_secure_password_here` içeriyordu, Docker'daki Postgres ise `postgres` şifresiyle açılıyordu. Bu yüzden şablonu kopyalayan biri `prisma migrate` adımında **`P1000: Authentication failed`** hatası alıyordu.
+- **İkinci takılma noktası:** Projeyi daha önce kurmuş biri `git pull` sonrası sadece `migrate deploy` + seed çalıştırdığında Prisma Client eski şemayla kalıyordu ve seed `Property 'application' does not exist` hatası veriyordu. Çözüm olarak 5. adıma `npx prisma generate` eklendi.
+- **Üçüncü olası takılma:** README'deki `curl` örnekleri Windows cmd/PowerShell'de çalışmıyordu. PowerShell karşılıkları ve Swagger yolu eklendi.
 - **Düzeltme:**
   - Kurulum bölümü yukarıdaki 7 adımlı sıraya getirildi.
   - `server/.env.example` ve `server/.example.env` içindeki bağlantı bilgileri `docker-compose.yml` varsayılanlarıyla eşitlendi.
