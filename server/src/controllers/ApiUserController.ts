@@ -10,6 +10,7 @@
 
 import { Request, Response } from "express";
 import { userModel } from "../models/User.model";
+import { JobPostingModel } from "../models/JobPosting.model";
 
 export class ApiUserController {
   /**
@@ -40,7 +41,15 @@ export class ApiUserController {
       return;
     }
 
-    res.status(200).json(user);
+    // Kullanıcının ilanlarını yanıta ekle (DB yoksa boş liste)
+    let jobs: Awaited<ReturnType<typeof JobPostingModel.findByAuthor>> = [];
+    try {
+      jobs = await JobPostingModel.findByAuthor(String(user.id));
+    } catch {
+      jobs = [];
+    }
+
+    res.status(200).json({ ...user, jobs });
   }
 
   /**

@@ -41,6 +41,10 @@ export const swaggerSpec = {
       description: "Duyuru Yönetimi RESTful JSON API (/api/announcements) - ApiAnnouncementController",
     },
     {
+      name: "Jobs & Applications (JSON)",
+      description: "İş ilanları ve başvurular (/api/users/:id/jobs, /api/jobs/:id/applications)",
+    },
+    {
       name: "Alumni",
       description: "Hafta 03 Mezun kayıtları CRUD işlemleri (/api/alumni)",
     },
@@ -241,7 +245,7 @@ export const swaggerSpec = {
     "/api/users/{id}": {
       get: {
         tags: ["User API (JSON)"],
-        summary: "ID'ye göre tekil kullanıcı getir",
+        summary: "ID'ye göre tekil kullanıcı getir (ilanları 'jobs' alanında)",
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "integer" } },
         ],
@@ -298,6 +302,86 @@ export const swaggerSpec = {
         responses: {
           "200": { description: "Kullanıcı silindi" },
           "404": { description: "Kullanıcı bulunamadı" },
+        },
+      },
+    },
+
+    // ------------------------------------------------------------------------
+    // JOBS & APPLICATIONS (JSON)
+    // ------------------------------------------------------------------------
+    "/api/users/{id}/jobs": {
+      get: {
+        tags: ["Jobs & Applications (JSON)"],
+        summary: "Kullanıcının iş ilanları",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" }, description: "Kullanıcı UUID" }],
+        responses: { "200": { description: "İlan listesi" }, "404": { description: "Kullanıcı bulunamadı" } },
+      },
+      post: {
+        tags: ["Jobs & Applications (JSON)"],
+        summary: "Kullanıcı adına iş ilanı oluştur",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" }, description: "Kullanıcı UUID" }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["title", "company", "location", "description"],
+                properties: {
+                  title: { type: "string", example: "Junior Backend Developer" },
+                  company: { type: "string", example: "Trendyol" },
+                  location: { type: "string", example: "İstanbul (Hibrit)" },
+                  description: { type: "string", example: "Node.js bilen mezun arıyoruz." },
+                  type: { type: "string", enum: ["FULL_TIME", "PART_TIME", "INTERNSHIP", "REMOTE", "CONTRACT"] },
+                  industry: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": { description: "İlan oluşturuldu" },
+          "400": { description: "Eksik/geçersiz alan" },
+          "404": { description: "Kullanıcı bulunamadı" },
+        },
+      },
+    },
+    "/api/users/{id}/applications": {
+      get: {
+        tags: ["Jobs & Applications (JSON)"],
+        summary: "Kullanıcının yaptığı başvurular",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" }, description: "Kullanıcı UUID" }],
+        responses: { "200": { description: "Başvuru listesi (ilan bilgisiyle)" }, "404": { description: "Kullanıcı bulunamadı" } },
+      },
+    },
+    "/api/jobs/{id}/applications": {
+      get: {
+        tags: ["Jobs & Applications (JSON)"],
+        summary: "İlana başvuranlar",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }, description: "İlan ID" }],
+        responses: { "200": { description: "Başvuran listesi (kullanıcı bilgisiyle)" }, "404": { description: "İlan bulunamadı" } },
+      },
+      post: {
+        tags: ["Jobs & Applications (JSON)"],
+        summary: "İlana başvur",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }, description: "İlan ID" }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["userId"],
+                properties: { userId: { type: "string" }, coverLetter: { type: "string" } },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": { description: "Başvuru oluşturuldu" },
+          "400": { description: "userId eksik" },
+          "404": { description: "İlan ya da kullanıcı bulunamadı" },
+          "409": { description: "Bu kullanıcı bu ilana zaten başvurmuş" },
         },
       },
     },

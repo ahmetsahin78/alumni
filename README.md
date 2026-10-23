@@ -7,21 +7,25 @@ A modern, comprehensive web platform designed for universities (such as Istanbul
 
 ---
 
-## 🏛️ Hafta 04: MVC (Model - View - Controller) Mimarisi ve Veritabanı Entegrasyonu
+## 🏛️ Mimari: MVC + PostgreSQL (Prisma ORM)
 
-Bu hafta kapsamında projemiz, **Clean Architecture** ve **MVC (Model-View-Controller)** tasarım deseni prensiplerine göre yapılandırılmıştır. Eğitmenin ders içi yönergesi doğrultusunda **henüz herhangi bir veritabanı bağlantısı kullanılmamış** ("without database yet"), tüm veri modeli ve CRUD operasyonları tip güvenli biçimde **In-Memory (Bellek İçi)** olarak kurgulanmıştır.
+Proje **MVC (Model-View-Controller)** desenine göre katmanlanmıştır. Hafta 04'te modeller **In-Memory** olarak başladı; sonraki haftalarda kalıcılık **PostgreSQL + Prisma ORM** ile sağlandı. Modeller (`User.model.ts` vb.) artık doğrudan veritabanını kullanır. Veritabanına ulaşılamazsa `User`/`Announcement` modelleri geçici olarak bellek içi yedek veriye düşer (sadece demo amaçlı).
 
 ### 📐 Katmanlı Mimari Şeması
 
 ```
-[İstemci / Tarayıcı] 
+[İstemci / Tarayıcı]
        │
        ▼
  [Express Router] (server/src/routes)
-   ├── /users          ──► UserController          ──► UserViews (HTML)          ◄── UserModel (In-Memory)
-   ├── /api/users      ──► ApiUserController       ──► JSON Response (REST API)  ◄── UserModel (In-Memory)
-   ├── /announcements  ──► AnnouncementController  ──► AnnouncementViews (HTML)   ◄── AnnouncementModel (In-Memory)
-   └── /api/announc... ──► ApiAnnouncementContr... ──► JSON Response (REST API)  ◄── AnnouncementModel (In-Memory)
+   ├── /users                    ──► UserController          ──► UserViews (HTML)   ◄── UserModel ─┐
+   ├── /api/users                ──► ApiUserController       ──► JSON               ◄── UserModel  │
+   ├── /api/users/:id/jobs       ──► ApiJobController        ──► JSON               ◄── JobPostingModel
+   ├── /api/jobs/:id/applications──► ApiJobController        ──► JSON               ◄── ApplicationModel
+   ├── /announcements            ──► AnnouncementController  ──► AnnouncementViews  ◄── AnnouncementModel
+   └── /api/announcements        ──► ApiAnnouncementController ► JSON               ◄── AnnouncementModel
+                                                                                          │
+                                                                    Prisma Client ◄───────┘──► PostgreSQL
 ```
 
 ### 🧱 Katmanların Rolleri ve Sorumlulukları
@@ -29,6 +33,9 @@ Bu hafta kapsamında projemiz, **Clean Architecture** ve **MVC (Model-View-Contr
 1. **Model Katmanı (`server/src/models/`)**:
    - **`User.model.ts`**: Kullanıcı/Mezun verilerinin (`IUser`) bellek içi koleksiyonunu yönetir. Temel CRUD metotlarını (`findAll`, `findById`, `findByEmail`, `create`, `replace`, `patch`, `delete`, `reset`) barındırır.
    - **`Announcement.model.ts`**: Ödev görevi (Homework) kapsamında duyuruların (`IAnnouncement`) model yapısını ve CRUD işlemlerini yürütür.
+   - **`JobPosting.model.ts`**: `job_postings` tablosu (kullanıcının ilanları, doğrulama, oluşturma).
+   - **`Application.model.ts`**: `applications` tablosu (başvuru oluşturma, `(jobId, userId)` tekrarında `DuplicateApplicationError` → 409, iki liste).
+   - Prisma şeması ve ilişkiler: `server/prisma/schema.prisma`. Tablo tasarımı: [ddd.md](./ddd.md).
 
 2. **View Katmanı (`server/src/views/`)**:
    - Sunucu taraflı HTML (Server-Side Rendering) görünüm şablonları üretir.
@@ -38,7 +45,7 @@ Bu hafta kapsamında projemiz, **Clean Architecture** ve **MVC (Model-View-Contr
 
 3. **Controller Katmanı (`server/src/controllers/`)**:
    - **View Controller'lar (`UserController.ts`, `AnnouncementController.ts`)**: HTTP isteklerini karşılar, Model'den veriyi çeker ve ilgili HTML görünümünü oluşturup tarayıcıya döner veya form işlemlerinde yönlendirme (redirect) yapar.
-   - **API Controller'lar (`ApiUserController.ts`, `ApiAnnouncementController.ts`)**: RESTful JSON servisleridir. Standart HTTP durum kodları (200 OK, 201 Created, 400 Bad Request, 404 Not Found) ile JSON yanıt döner.
+   - **API Controller'lar (`ApiUserController.ts`, `ApiAnnouncementController.ts`, `ApiJobController.ts`)**: RESTful JSON servisleridir. Standart HTTP durum kodları (200 OK, 201 Created, 400 Bad Request, 404 Not Found, 409 Conflict) ile JSON yanıt döner.
 
 4. **Routing Katmanı (`server/src/routes/`)**:
    - İstek URL'lerini ve HTTP metotlarını (GET, POST, PUT, PATCH, DELETE) ilgili Controller fonksiyonlarına eşler.
@@ -51,65 +58,37 @@ Bu hafta kapsamında projemiz, **Clean Architecture** ve **MVC (Model-View-Contr
 
 ```plaintext
 alumni-tracking-system/
-├── docker-compose.yml              # Konteyner orkestrasyon dosyası
-├── .env.example                    # Örnek çevre değişkenleri
-├── README.md                       # Proje dokümantasyonu & MVC mimari rehberi
+├── docker-compose.yml              # PostgreSQL + server + client konteynerleri
+├── .env.example                    # Kök ortam değişkenleri şablonu (docker compose okur)
+├── README.md                       # Bu dosya
+├── ddd.md                          # Veri tasarımı: tablolar, FK'ler, delete rule
 │
-├── client/                         # Frontend (Next.js 14+ & Tailwind CSS)
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── src/
-│   │   ├── app/                    # Next.js uygulama sayfaları ve routing
-│   │   ├── components/             # Yeniden kullanılabilir UI bileşenleri
-│   │   └── styles/                 # Global CSS ve stiller
-│   └── tsconfig.json
+├── client/                         # Frontend (Next.js 14 + Tailwind CSS)
+│   └── src/app, src/components, src/lib
 │
-└── server/                         # Backend (Node.js + Express + TypeScript)
-    ├── Dockerfile
+└── server/                         # Backend (Node.js + Express + TypeScript + Prisma)
+    ├── .env.example                # Server ortam değişkenleri şablonu (cp ile .env yapılır)
     ├── package.json
-    ├── public/                     # Statik HTML & varlıklar (Landing page, about)
-    │   ├── index.html              # API Paneli ve hızlı erişim sayfası
-    │   └── about.html              # Hakkında sayfası
-    │
-    ├── src/
-    │   ├── index.ts                # Sunucu ana giriş noktası ve global middleware'ler
-    │   ├── test-runner.ts          # Otomatik uçtan uca test koşucusu (In-Memory & MVC)
-    │   │
-    │   ├── models/                 # [MODEL KATMANI] Veri modelleri ve In-Memory CRUD
-    │   │   ├── User.model.ts       # Kullanıcı modeli (IUser, CRUD metotları)
-    │   │   └── Announcement.model.ts # Duyuru modeli (IAnnouncement, CRUD metotları)
-    │   │
-    │   ├── views/                  # [VIEW KATMANI] Sunucu taraflı HTML Görünümleri
-    │   │   ├── layout.ts           # Ortak responsive sayfa şablonu ve navbar
-    │   │   ├── user.views.ts       # Kullanıcı liste, detay, form görünümleri
-    │   │   └── announcement.views.ts # Duyuru panosu ve yönetim arayüzü
-    │   │
-    │   ├── controllers/            # [CONTROLLER KATMANI] İstek yöneticileri
-    │   │   ├── UserController.ts   # Kullanıcı View Controller (HTML sayfaları)
-    │   │   ├── ApiUserController.ts # Kullanıcı API Controller (JSON REST)
-    │   │   ├── AnnouncementController.ts # Duyuru View Controller (HTML sayfaları)
-    │   │   ├── ApiAnnouncementController.ts # Duyuru API Controller (JSON REST)
-    │   │   ├── alumni.controller.ts # Hafta 03 mezun kontrolcüsü
-    │   │   └── health.controller.ts # Sistem sağlık kontrolcüsü
-    │   │
-    │   ├── routes/                 # [ROUTING KATMANI] Rota tanımlamaları
-    │   │   ├── index.ts            # API rotalarını birleştiren ana yönlendirici
-    │   │   ├── user.routes.ts      # GET/POST /users (View rotaları)
-    │   │   ├── apiUser.routes.ts   # CRUD /api/users (JSON REST API rotaları)
-    │   │   ├── announcement.routes.ts # GET/POST /announcements (View rotaları)
-    │   │   ├── apiAnnouncement.routes.ts # CRUD /api/announcements (JSON REST rotaları)
-    │   │   ├── alumni.routes.ts    # /api/alumni rotaları (Hafta 03)
-    │   └── utility.routes.ts   # /hello/:name, /sum/:n1/:n2 rotaları
-    │   │
-    │   ├── docs/                   # Dokümantasyon
-    │   │   └── swaggerSpec.ts      # OpenAPI 3.0 / Swagger tanımları
-    │   │
-    │   ├── storage/                # Depolama
-    │   │   └── inMemoryStore.ts    # Hafta 03 in-memory alumni deposu
-    │   │
-    │   └── types/                  # TypeScript tip ve arayüz tanımları
-    │       └── alumni.types.ts
-    └── tsconfig.json
+    ├── prisma/
+    │   ├── schema.prisma           # Modeller ve ilişkiler (User, JobPosting, Application, ...)
+    │   ├── seed.ts                 # Tabloları doğru sırayla boşaltır, id sayaçlarını sıfırlar, örnek veri ekler
+    │   └── migrations/
+    │       ├── 20261014_init/                          # İlk şema
+    │       └── 20261023160000_job_postings_applications/ # job_postings INT id + applications tablosu
+    ├── public/                     # Statik sayfalar (index.html, about.html)
+    └── src/
+        ├── index.ts                # Express uygulaması ve global middleware'ler
+        ├── prisma.ts               # Paylaşılan PrismaClient
+        ├── test-runner.ts          # Uçtan uca testler (npm test)
+        ├── models/                 # [MODEL] User, Announcement, JobPosting, Application
+        ├── views/                  # [VIEW] layout, user.views (profil + ilanlar), announcement.views
+        ├── controllers/            # [CONTROLLER] UserController, ApiUserController, ApiJobController, ...
+        ├── routes/                 # Rota tanımları (index.ts hepsini /api altında birleştirir)
+        ├── database/factories/     # user, job, application, announcement, alumni factory'leri
+        ├── services/               # job, auth, event, mentorship servisleri
+        ├── docs/swaggerSpec.ts     # OpenAPI 3.0 tanımları
+        ├── storage/                # Hafta 03 in-memory alumni deposu
+        └── types/
 ```
 
 ---
@@ -133,6 +112,31 @@ alumni-tracking-system/
 | **PUT** | `/api/users/:id` | REST API | Kullanıcıyı bütünsel olarak günceller |
 | **PATCH** | `/api/users/:id` | REST API | Kullanıcıyı kısmi olarak günceller |
 | **DELETE** | `/api/users/:id` | REST API | Kullanıcı kaydını siler (`200 OK`) |
+
+### 1b. İş İlanları ve Başvurular (Jobs & Applications)
+
+| HTTP Metodu | Rota / URL | Başarılı | Hata durumları |
+| :--- | :--- | :--- | :--- |
+| **POST** | `/api/users/:id/jobs` | `201` oluşturulan ilan | `400` eksik alan (`title`, `company`, `location`, `description`), `404` kullanıcı yok |
+| **GET** | `/api/users/:id/jobs` | `200` kullanıcının ilanları | `404` kullanıcı yok |
+| **GET** | `/api/users/:id` | `200` kullanıcı + `jobs` dizisi | `404` kullanıcı yok |
+| **GET** | `/users/:id` | HTML profil sayfası + ilan tablosu | `404` |
+| **POST** | `/api/jobs/:id/applications` | `201` başvuru (body: `{ "userId": "..." }`) | `409` aynı kullanıcı ikinci kez, `404` ilan ya da kullanıcı yok, `400` `userId` eksik |
+| **GET** | `/api/jobs/:id/applications` | `200` ilana başvuranlar (kullanıcı bilgisiyle) | `404` ilan yok |
+| **GET** | `/api/users/:id/applications` | `200` kullanıcının başvuruları (ilan bilgisiyle) | `404` kullanıcı yok |
+
+> Kullanıcı id'leri UUID, ilan ve başvuru id'leri INT'tir. **Delete rule:** kullanıcı silinince ilanları ve başvuruları, ilan silinince başvuruları silinir (`ON DELETE CASCADE`, ayrıntı: [ddd.md](./ddd.md), bölüm 7b).
+
+Hızlı deneme (seed sonrası; `<USER_ID>` için `GET /api/users` çıktısından bir id alın):
+
+```bash
+curl -X POST http://localhost:5001/api/users/<USER_ID>/jobs \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Stajyer","company":"Trendyol","location":"İstanbul","description":"Yaz stajı"}'
+
+curl -X POST http://localhost:5001/api/jobs/1/applications \
+  -H "Content-Type: application/json" -d '{"userId":"<USER_ID>"}'   # 201, tekrar -> 409
+```
 
 ### 2. Duyuru Modülü (Announcement Module - Ödev Görevleri)
 
@@ -166,46 +170,127 @@ alumni-tracking-system/
 
 ---
 
-## 🛠️ Kurulum ve Çalıştırma
+## 🛠️ Kurulum ve Çalıştırma (sıfırdan, adım adım)
 
-### 1. Geliştirme Sunucusunu Başlatma
+**Gerekenler:** Node.js 20+, npm, Git ve Docker Desktop (veritabanı için). Docker yerine kendi PostgreSQL 16 kurulumunuzu da kullanabilirsiniz (aşağıda not var).
+
+> Komutlar macOS/Linux terminali ve Windows **PowerShell** için aynıdır. (Eski `cmd.exe` kullanıyorsanız `cp` yerine `copy` yazın.)
+
+### 1. Clone
+
+```bash
+git clone https://github.com/ahmetsahin78/alumni-tracking-system.git
+cd alumni-tracking-system
+```
+
+### 2. Install
 
 ```bash
 cd server
 npm install
+```
+
+`npm install` sonunda Prisma Client otomatik üretilir. Üretilmezse: `npx prisma generate`.
+
+### 3. `.env` dosyası
+
+```bash
+# hâlâ server/ klasöründesiniz
+cp .env.example .env
+```
+
+Şablondaki `DATABASE_URL` (`postgres` / `postgres` @ `localhost:5432` / `alumni_db`), `docker-compose.yml` içindeki Postgres ile birebir aynıdır, değiştirmeden çalışır. Kendi Postgres'inizi kullanıyorsanız sadece `DATABASE_URL`'i düzenleyin. `.env` git'e eklenmez (`.gitignore`).
+
+### 4. Database'i başlat
+
+```bash
+# proje kök klasöründen sadece veritabanı konteynerini açın
+cd ..
+docker compose up -d postgres
+docker compose ps          # alumni_postgres "healthy" olana kadar birkaç saniye bekleyin
+cd server
+```
+
+*Docker yoksa:* kendi PostgreSQL'inizde `alumni_db` adında bir veritabanı oluşturup `.env` içindeki `DATABASE_URL`'i ona göre güncelleyin.
+
+### 5. Migrate
+
+```bash
+npx prisma migrate deploy
+```
+
+Bu komut `prisma/migrations/` altındaki iki migration'ı sırayla uygular: `init` ve `job_postings_applications`. Şemayı kendiniz değiştirdiğinizde yeni migration üretmek için `npm run prisma:migrate` (`prisma migrate dev`) kullanın.
+
+### 6. Seed
+
+```bash
+npm run prisma:seed
+```
+
+Seed tabloları FK sırasına göre (önce `applications`, en son `users`) boşaltır, INT id sayaçlarını 1'e sıfırlar ve örnek kullanıcı, ilan ve başvuru ekler. Tekrar tekrar çalıştırılabilir. Her seferinde ilk ilanın id'si `1` olur.
+
+> Her şeyi silip baştan kurmak için: `npx prisma migrate reset` (migration'ları yeniden uygular ve seed'i otomatik çalıştırır).
+
+### 7. Start
+
+```bash
 npm run dev
 ```
 
-Sunucu varsayılan olarak **`http://localhost:5001`** üzerinde çalışır:
-- 👤 Kullanıcı Yönetim Arayüzü: [http://localhost:5001/users](http://localhost:5001/users)
-- 📢 Duyurular Panosu (Ödev Arayüzü): [http://localhost:5001/announcements](http://localhost:5001/announcements)
-- 📖 Swagger Dokümantasyonu: [http://localhost:5001/api/swagger](http://localhost:5001/api/swagger)
-- 💚 Sağlık Kontrolü: [http://localhost:5001/api/health](http://localhost:5001/api/health)
+Sunucu **`http://localhost:5001`** adresinde açılır:
+- 👤 Kullanıcılar (HTML): [http://localhost:5001/users](http://localhost:5001/users). Bir kullanıcıya tıklayınca profilinde **iş ilanları** listelenir.
+- 🔌 Kullanıcılar API: [http://localhost:5001/api/users](http://localhost:5001/api/users)
+- 📢 Duyurular: [http://localhost:5001/announcements](http://localhost:5001/announcements)
+- 📖 Swagger: [http://localhost:5001/api/swagger](http://localhost:5001/api/swagger)
+- 💚 Sağlık: [http://localhost:5001/api/health](http://localhost:5001/api/health)
 
-### 2. Otomatik Testleri Koşma
-
-Tüm In-Memory CRUD operasyonlarını, HTML görünümlerini ve Swagger entegrasyonunu doğrulamak için:
+### 8. Testler
 
 ```bash
 npm test
 ```
 
+Testler kullanıcı, duyuru, view ve swagger uçlarına ek olarak, veritabanı bağlıyken **jobs ve applications** akışını da sınar: 201/400/404, `GET /api/users/:id` içindeki `jobs`, başvuruda 201/409/404, iki liste, profil sayfası ve delete rule (cascade). Sonda `0 FAILED` görmelisiniz.
+
+### (Opsiyonel) Frontend
+
+```bash
+cd ../client
+npm install
+npm run dev      # http://localhost:3000
+```
+
+### 🧯 Sık Karşılaşılan Hatalar
+
+| Hata | Sebep / Çözüm |
+| :--- | :--- |
+| `P1000: Authentication failed` | `server/.env` içindeki kullanıcı/şifre, çalışan Postgres ile uyuşmuyor. Docker kullanıyorsanız şablondaki `postgres:postgres` değerini değiştirmeyin. |
+| `P1001: Can't reach database server at localhost:5432` | Postgres çalışmıyor: `docker compose up -d postgres`. |
+| `port 5432 is already allocated` | Bilgisayarda başka bir Postgres çalışıyor. Onu durdurun ya da kök `.env`'de `DB_PORT=5433` yapıp `DATABASE_URL`'deki portu da `5433` yapın. |
+| `@prisma/client did not initialize yet` | `npx prisma generate` çalıştırın. |
+| `The table "public.applications" does not exist` | Migration uygulanmamış: `npx prisma migrate deploy`. |
+
 ---
 
 ## 🔐 Ortam Değişkenleri (Environment Variables)
 
-Projede veritabanı bağlantı bilgileri, portlar ve uygulama sırları `.env` dosyası üzerinden okunur:
-- **Gizlilik & Git:** `.env` dosyası `.gitignore` içinde tanımlanmış olup versiyon kontrolüne kesinlikle dahil edilmez.
-- **Şablon Dosyaları:** Yeni geliştiriciler ve kurulumlar için hassas bilgi içermeyen `.env.example` ve `.example.env` şablonları hem kök dizinde hem de `server/` altında sunulmuştur:
-  ```bash
-  # Kök dizinde:
-  cp .env.example .env
-  # veya
-  cp .example.env .env
+- **`server/.env`**: `npm run dev`, Prisma CLI ve seed bunu okur. `server/.env.example`'dan kopyalanır (adım 3).
+- **Kök `.env`** (opsiyonel): sadece `docker compose` okur (DB kullanıcı/şifre/port). Yoksa varsayılanlar kullanılır: `postgres` / `postgres` / `alumni_db` / `5432`. Oluşturmak için kök dizinde `cp .env.example .env`.
+- `.env` dosyaları `.gitignore` içindedir. Repoda yalnızca hassas bilgi içermeyen şablonlar (`.env.example`, `.example.env`) bulunur.
 
-  # server dizininde:
-  cp server/.env.example server/.env
-  ```
+---
+
+## ✅ Sınav Öncesi Kontrol: "README'den Kurulum" Testi
+
+Amaç: bir sınıf arkadaşının projeyi **sadece bu README'yi** takip ederek sıfırdan kurabilmesi (clone → install → .env → database → migrate → seed → start).
+
+- **Bulunan ilk takılma noktası:** Önceki README'de yerel kurulum sadece `npm install` + `npm run dev`'den ibaretti. `.env`, veritabanı, migrate ve seed adımları yoktu. Ayrıca `server/.env.example` şifre olarak `your_secure_password_here` içeriyordu, Docker'daki Postgres ise `postgres` şifresiyle açılıyordu. Bu yüzden şablonu kopyalayan biri `prisma migrate` adımında **`P1000: Authentication failed`** hatası alıyordu.
+- **Düzeltme:**
+  - Kurulum bölümü yukarıdaki 7 adımlı sıraya getirildi.
+  - `server/.env.example` ve `server/.example.env` içindeki bağlantı bilgileri `docker-compose.yml` varsayılanlarıyla eşitlendi.
+  - Seed script'i tek seferlik çalışan `ts-node` ile çalıştırılıyor.
+  - `prisma migrate reset` için `"prisma": { "seed": ... }` ayarı eklendi.
+  - Hata tablosu eklendi.
 
 ---
 
@@ -217,7 +302,7 @@ Sistem, çoklu konteyner mimarisini yönetmek ve veritabanı kalıcılığını 
 # 1. Konteynerleri inşa et ve başlat
 docker compose up --build -d
 
-# 2. Veritabanı tablolarını göç et (Migration)
+# 2. Veritabanı tablolarını oluştur (Migration: init + job_postings_applications)
 docker compose exec server npx prisma migrate deploy
 
 # 3. Başlangıç verilerini (Seed) yükle

@@ -13,6 +13,25 @@
 import { IUser } from "../models/User.model";
 import { renderLayout } from "./layout";
 
+/** Detay sayfasında listelenen ilan satırı */
+export interface UserJobPosting {
+  id: number;
+  title: string;
+  company: string;
+  location: string;
+  type: string;
+  _count?: { applications: number };
+}
+
+/** Kullanıcı girdisini HTML'e güvenle basmak için */
+function esc(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export class UserViews {
   /**
    * 1. Kullanıcı Listesi Sayfası (Read - All)
@@ -128,7 +147,40 @@ export class UserViews {
   /**
    * 2. Tekil Kullanıcı Detay Sayfası (Read - One)
    */
-  public static renderDetail(user: IUser): string {
+  public static renderDetail(user: IUser, jobs: UserJobPosting[] = []): string {
+    const jobRows = jobs
+      .map(
+        (job) => `
+            <tr>
+              <td>#${job.id}</td>
+              <td style="font-weight: 600;">${esc(job.title)}</td>
+              <td>${esc(job.company)}</td>
+              <td>${esc(job.location)}</td>
+              <td><span class="badge badge-neutral">${job.type}</span></td>
+              <td>${job._count?.applications ?? 0}</td>
+              <td><a href="/api/jobs/${job.id}/applications" class="btn btn-secondary btn-sm">Başvuranlar (JSON)</a></td>
+            </tr>`
+      )
+      .join("");
+
+    const jobsSection = `
+      <div class="card" style="max-width: 800px; margin: 1.5rem auto 0;" id="jobs">
+        <div class="card-header" style="background: #f8fafc;">
+          <h3 style="font-size: 1.15rem; font-weight: 800; color: #0f172a;">💼 İş İlanları (${jobs.length})</h3>
+          <a href="/api/users/${user.id}/jobs" class="btn btn-secondary btn-sm">JSON</a>
+        </div>
+        <div class="card-body">
+          ${
+            jobs.length === 0
+              ? `<p style="color: #64748b;">Bu kullanıcının yayınladığı bir ilan yok.</p>`
+              : `<div style="overflow-x: auto;"><table class="data-table">
+                  <thead><tr><th>ID</th><th>Başlık</th><th>Şirket</th><th>Konum</th><th>Tür</th><th>Başvuru</th><th></th></tr></thead>
+                  <tbody>${jobRows}</tbody>
+                </table></div>`
+          }
+        </div>
+      </div>`;
+
     const content = `
       <div style="margin-bottom: 1.5rem;">
         <a href="/users" class="btn btn-secondary btn-sm">⬅️ Kullanıcı Listesine Dön</a>
@@ -188,6 +240,7 @@ export class UserViews {
           </div>
         </div>
       </div>
+      ${jobsSection}
     `;
 
     return renderLayout(content, {

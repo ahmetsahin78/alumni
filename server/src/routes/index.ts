@@ -3,6 +3,7 @@ import { HealthController } from "../controllers/health.controller";
 import alumniRoutes from "./alumni.routes";
 import apiUserRoutes from "./apiUser.routes";
 import apiAnnouncementRoutes from "./apiAnnouncement.routes";
+import jobRoutes from "./job.routes";
 import utilityRoutes from "./utility.routes";
 
 const router = Router();
@@ -28,7 +29,12 @@ router.use("/users", apiUserRoutes);
 router.use("/announcements", apiAnnouncementRoutes);
 
 /**
- * 5. Utility Routes (/api/hello, /api/sum)
+ * 5. Job Postings & Applications (/api/jobs)
+ */
+router.use("/jobs", jobRoutes);
+
+/**
+ * 6. Utility Routes (/api/hello, /api/sum)
  */
 router.use("/", utilityRoutes);
 

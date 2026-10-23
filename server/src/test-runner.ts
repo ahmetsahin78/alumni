@@ -4,6 +4,7 @@ import app from "./index";
 import { alumniStore } from "./storage/inMemoryStore";
 import { userModel } from "./models/User.model";
 import { announcementModel } from "./models/Announcement.model";
+import prisma from "./prisma";
 
 async function runCourseAssignmentTests() {
   console.log("\n============================================================");
@@ -70,7 +71,11 @@ async function runCourseAssignmentTests() {
     const apiUsers: any = await apiUsersRes.json();
     assert(Array.isArray(apiUsers), "GET /api/users returns JSON array");
     assert(apiUsers.length >= 5, `Initial users count is at least 5 (got ${apiUsers.length})`);
-    assert(apiUsers[0].name === "Elif Kaya", "First user name is 'Elif Kaya'");
+    // Kullanıcı id'leri DB'de UUID ve sıralama id'ye göre olduğu için "ilk kullanıcı" sabit değil;
+    // seed kullanıcısını isimle bulup id'sini sonraki testlerde kullanıyoruz.
+    const elif = apiUsers.find((u: any) => u.name === "Elif Kaya");
+    assert(Boolean(elif), "Seed user 'Elif Kaya' exists in GET /api/users");
+    const elifId = elif ? String(elif.id) : "1";
 
     // 3.2 POST /api/users (201 Created)
     const newUserPayload = {
@@ -126,6 +131,89 @@ async function runCourseAssignmentTests() {
     assert(patchUserData.company === "ODTÜ & TÜBİTAK", "PATCH updated user company");
     assert(patchUserData.name === "Ord. Prof. Dr. Cahit Arf", "PATCH preserved user name");
 
+    // ------------------------------------------------------------------
+    // 3.J Job Postings & Applications (yalnızca veritabanı bağlıyken)
+    // ------------------------------------------------------------------
+    let dbReady = true;
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+    } catch {
+      dbReady = false;
+    }
+
+    let createdJobId: number | null = null;
+    let applicantId: string | null = null;
+
+    if (!dbReady) {
+      console.log("⚠️  Veritabanı yok: jobs/applications testleri atlandı.");
+    } else {
+      console.log("\n--- 3.J Jobs & Applications API Tests ---");
+      const json = (body: unknown) => ({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const unknownUser = "00000000-0000-0000-0000-000000000000";
+
+      // POST /api/users/:id/jobs
+      const jobRes = await fetch(
+        `${baseUrl}/api/users/${createdUserId}/jobs`,
+        json({ title: "Test Engineer", company: "TÜBİTAK", location: "Ankara", description: "Test ilanı" })
+      );
+      assert(jobRes.status === 201, "POST /api/users/:id/jobs returns 201");
+      const job: any = await jobRes.json();
+      createdJobId = job.id;
+      assert(Number.isInteger(job.id) && job.authorId === createdUserId, "Created job has INT id and correct authorId");
+
+      const badJobRes = await fetch(`${baseUrl}/api/users/${createdUserId}/jobs`, json({ title: "Eksik" }));
+      assert(badJobRes.status === 400, "POST /api/users/:id/jobs with missing fields returns 400");
+
+      const unknownJobRes = await fetch(
+        `${baseUrl}/api/users/${unknownUser}/jobs`,
+        json({ title: "x", company: "x", location: "x", description: "x" })
+      );
+      assert(unknownJobRes.status === 404, "POST /api/users/:id/jobs for unknown user returns 404");
+
+      // GET /api/users/:id/jobs
+      const listJobsRes = await fetch(`${baseUrl}/api/users/${createdUserId}/jobs`);
+      const listJobs: any = await listJobsRes.json();
+      assert(listJobsRes.status === 200 && listJobs.length === 1, "GET /api/users/:id/jobs lists the user's job");
+      const unknownListRes = await fetch(`${baseUrl}/api/users/${unknownUser}/jobs`);
+      assert(unknownListRes.status === 404, "GET /api/users/:id/jobs for unknown user returns 404");
+
+      // GET /api/users/:id contains jobs
+      const withJobs: any = await (await fetch(`${baseUrl}/api/users/${createdUserId}`)).json();
+      assert(Array.isArray(withJobs.jobs) && withJobs.jobs[0]?.id === createdJobId, "GET /api/users/:id includes the user's jobs");
+
+      // Başvuran kullanıcı
+      const applicantRes = await fetch(
+        `${baseUrl}/api/users`,
+        json({ name: "Test Basvuran", email: `basvuran.${Date.now()}@istanbul.edu.tr`, graduationYear: 2025 })
+      );
+      const applicant: any = await applicantRes.json();
+      applicantId = applicant.id;
+
+      // POST /api/jobs/:id/applications -> 201, 409, 404
+      const applyRes = await fetch(`${baseUrl}/api/jobs/${createdJobId}/applications`, json({ userId: applicantId }));
+      assert(applyRes.status === 201, "POST /api/jobs/:id/applications returns 201");
+      const applyAgain = await fetch(`${baseUrl}/api/jobs/${createdJobId}/applications`, json({ userId: applicantId }));
+      assert(applyAgain.status === 409, "Second application by same user returns 409");
+      const applyNoJob = await fetch(`${baseUrl}/api/jobs/999999/applications`, json({ userId: applicantId }));
+      assert(applyNoJob.status === 404, "Application to unknown job returns 404");
+      const applyNoUser = await fetch(`${baseUrl}/api/jobs/${createdJobId}/applications`, json({ userId: unknownUser }));
+      assert(applyNoUser.status === 404, "Application by unknown user returns 404");
+
+      // İki liste
+      const applicants: any = await (await fetch(`${baseUrl}/api/jobs/${createdJobId}/applications`)).json();
+      assert(applicants.length === 1 && applicants[0].user?.id === applicantId, "GET /api/jobs/:id/applications lists applicants");
+      const myApps: any = await (await fetch(`${baseUrl}/api/users/${applicantId}/applications`)).json();
+      assert(myApps.length === 1 && myApps[0].job?.id === createdJobId, "GET /api/users/:id/applications lists the user's applications");
+
+      // HTML sayfa: kullanıcının ilanları görünüyor
+      const pageHtml = await (await fetch(`${baseUrl}/users/${createdUserId}`)).text();
+      assert(pageHtml.includes("Test Engineer"), "GET /users/:id page shows the user's postings");
+    }
+
     // 3.6 DELETE /api/users/:id
     const deleteUserRes = await fetch(`${baseUrl}/api/users/${createdUserId}`, {
       method: "DELETE",
@@ -137,6 +225,15 @@ async function runCourseAssignmentTests() {
     // 3.7 Verify 404 after delete
     const verifyUserGone = await fetch(`${baseUrl}/api/users/${createdUserId}`);
     assert(verifyUserGone.status === 404, "Subsequent GET /api/users/:id returns 404 Not Found");
+
+    // 3.8 Delete rule: yazar silinince ilanı ve başvuruları da silinir (CASCADE)
+    if (dbReady && createdJobId !== null) {
+      const jobGone = await fetch(`${baseUrl}/api/jobs/${createdJobId}/applications`);
+      assert(jobGone.status === 404, "Delete rule: author deleted -> job (and its applications) deleted");
+      const appsLeft = await prisma.application.count({ where: { jobId: createdJobId } });
+      assert(appsLeft === 0, "Delete rule: no orphan applications left");
+      if (applicantId) await prisma.user.delete({ where: { id: applicantId } }).catch(() => undefined);
+    }
 
     // -------------------------------------------------------------
     // Test 4: Bölüm 1 - User View Layer Tests (/users)
@@ -177,16 +274,17 @@ async function runCourseAssignmentTests() {
     assert(Boolean(location && location.includes("/users")), "POST /users redirects to /users");
 
     // 4.4 GET /users/:id -> User Detail View
-    const userDetailRes = await fetch(`${baseUrl}/users/1`);
-    assert(userDetailRes.status === 200, "GET /users/1 returns HTTP 200");
+    const userDetailRes = await fetch(`${baseUrl}/users/${elifId}`);
+    assert(userDetailRes.status === 200, "GET /users/:id returns HTTP 200");
     const userDetailHtml = await userDetailRes.text();
-    assert(userDetailHtml.includes("Elif Kaya"), "GET /users/1 shows user detail 'Elif Kaya'");
+    assert(userDetailHtml.includes("Elif Kaya"), "GET /users/:id shows user detail 'Elif Kaya'");
+    assert(userDetailHtml.includes("Junior Backend Developer"), "GET /users/:id shows Elif's seeded job posting");
 
     // 4.5 GET /users/:id/edit -> User Edit Form View
-    const userEditFormRes = await fetch(`${baseUrl}/users/1/edit`);
-    assert(userEditFormRes.status === 200, "GET /users/1/edit returns HTTP 200");
+    const userEditFormRes = await fetch(`${baseUrl}/users/${elifId}/edit`);
+    assert(userEditFormRes.status === 200, "GET /users/:id/edit returns HTTP 200");
     const userEditHtml = await userEditFormRes.text();
-    assert(userEditHtml.includes('action="/users/1/edit"'), "Edit form action is /users/1/edit");
+    assert(userEditHtml.includes(`action="/users/${elifId}/edit"`), "Edit form action is /users/:id/edit");
 
     // -------------------------------------------------------------
     // Test 5: Bölüm 2 - Homework Announcement Model & REST API

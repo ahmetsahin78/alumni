@@ -33,6 +33,13 @@ enum JobType {
   CONTRACT
 }
 
+enum ApplicationStatus {
+  PENDING
+  REVIEWED
+  ACCEPTED
+  REJECTED
+}
+
 enum RSVPStatus {
   ATTENDING
   MAYBE
@@ -78,6 +85,7 @@ model User {
   mentorshipsAsMentor MentorshipRequest[] @relation("MentorRequests")
   mentorshipsAsMentee MentorshipRequest[] @relation("MenteeRequests")
   jobPostings         JobPosting[]
+  applications        Application[]
   eventsOrganized     Event[]             @relation("OrganizedEvents")
   eventRSVPs          EventRSVP[]
   announcements       Announcement[]
@@ -189,7 +197,7 @@ model MentorshipRequest {
 }
 
 model JobPosting {
-  id             String   @id @default(uuid())
+  id             Int      @id @default(autoincrement())
   authorId       String
   title          String
   company        String
@@ -204,11 +212,33 @@ model JobPosting {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  // Delete rule: kullanıcı silinince ilanları da silinir (CASCADE)
+  author       User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  applications Application[]
 
+  @@index([authorId])
   @@index([industry])
   @@index([type])
   @@map("job_postings")
+}
+
+model Application {
+  id          Int               @id @default(autoincrement())
+  jobId       Int
+  userId      String
+  status      ApplicationStatus @default(PENDING)
+  coverLetter String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Delete rule: ilan veya başvuran kullanıcı silinince başvuru da silinir (CASCADE)
+  job  JobPosting @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Bir kullanıcı aynı ilana yalnızca bir kez başvurabilir
+  @@unique([jobId, userId])
+  @@index([userId])
+  @@map("applications")
 }
 
 model Event {

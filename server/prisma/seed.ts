@@ -12,6 +12,8 @@ import bcrypt from "bcryptjs";
 import { UserFactory } from "../src/database/factories/user.factory";
 import { AnnouncementFactory } from "../src/database/factories/announcement.factory";
 import { AlumniFactory } from "../src/database/factories/alumni.factory";
+import { JobFactory } from "../src/database/factories/job.factory";
+import { ApplicationFactory } from "../src/database/factories/application.factory";
 
 const prisma = new PrismaClient();
 
@@ -19,10 +21,13 @@ async function main() {
   console.log("🌱 Starting database seed...");
 
   // 1. Clean existing records in correct foreign key order
+  //    Önce çocuk tablolar (FK tutanlar), en son users. Ters sırada silmek
+  //    FK kısıtı nedeniyle hata verir (ya da CASCADE ile istemeden siler).
   console.log("🧹 Cleaning old records...");
-  await prisma.eventRSVP.deleteMany();
-  await prisma.event.deleteMany();
-  await prisma.jobPosting.deleteMany();
+  await prisma.application.deleteMany();   // -> job_postings, users
+  await prisma.eventRSVP.deleteMany();     // -> events, users
+  await prisma.event.deleteMany();         // -> users
+  await prisma.jobPosting.deleteMany();    // -> users
   await prisma.mentorshipRequest.deleteMany();
   await prisma.userSkill.deleteMany();
   await prisma.skill.deleteMany();
@@ -32,6 +37,13 @@ async function main() {
   await prisma.announcement.deleteMany();
   await prisma.alumnus.deleteMany();
   await prisma.user.deleteMany();
+
+  // 1b. Reset auto-increment id counters so seeded ids start from 1 again
+  console.log("🔢 Resetting id counters...");
+  //    (users tablosu UUID kullandığı için sayacı yok)
+  for (const table of ["applications", "job_postings", "announcements", "alumni_records"]) {
+    await prisma.$executeRawUnsafe(`ALTER SEQUENCE "${table}_id_seq" RESTART WITH 1`);
+  }
 
   const passwordHash = await bcrypt.hash("Password123!", 10);
 
@@ -255,8 +267,9 @@ async function main() {
   // 4. Generate Additional Users with UserFactory
   console.log("🏭 Generating realistic users via UserFactory...");
   const factoryUsers = UserFactory.buildMany(6);
+  const factoryUserIds: string[] = [];
   for (const fUser of factoryUsers) {
-    await prisma.user.create({
+    const created = await prisma.user.create({
       data: {
         name: fUser.name,
         email: fUser.email,
@@ -269,6 +282,7 @@ async function main() {
         passwordHash,
       },
     });
+    factoryUserIds.push(created.id);
   }
 
   // 5. Seed Skills
@@ -331,9 +345,9 @@ async function main() {
     await prisma.alumnus.create({ data: item });
   }
 
-  // 8. Seed Job Postings
+  // 8. Seed Job Postings (id = 1 her seed'de aynı ilan)
   console.log("💼 Seeding Job Postings...");
-  await prisma.jobPosting.create({
+  const backendJob = await prisma.jobPosting.create({
     data: {
       authorId: alumni1.id,
       title: "Junior Backend Developer",
@@ -347,6 +361,28 @@ async function main() {
       salaryRange: "45.000 - 65.000 TL",
     },
   });
+
+  const factoryJobs = [
+    ...JobFactory.buildMany(2, alumni1.id),
+    ...JobFactory.buildMany(2, alumni2.id),
+  ];
+  const jobIds: number[] = [backendJob.id];
+  for (const job of factoryJobs) {
+    const created = await prisma.jobPosting.create({ data: job });
+    jobIds.push(created.id);
+  }
+
+  // 8b. Seed Applications (her (jobId, userId) çifti tek)
+  console.log("📨 Seeding Applications...");
+  const applicants = [student.id, ...factoryUserIds.slice(0, 3)];
+  const pairs: Array<[number, string]> = [
+    [backendJob.id, student.id],
+    [backendJob.id, alumni3.id],
+    ...applicants.map((userId, i) => [jobIds[(i + 1) % jobIds.length], userId] as [number, string]),
+  ];
+  for (const app of ApplicationFactory.buildForPairs(pairs)) {
+    await prisma.application.create({ data: app });
+  }
 
   // 9. Seed Events & RSVP
   console.log("📅 Seeding Events & RSVPs...");
@@ -389,6 +425,7 @@ async function main() {
   console.log("   - Announcements created:", await prisma.announcement.count());
   console.log("   - Alumni records created:", await prisma.alumnus.count());
   console.log("   - Job postings created:", await prisma.jobPosting.count());
+  console.log("   - Applications created:", await prisma.application.count());
   console.log("   - Events created:", await prisma.event.count());
   console.log("=======================================================\n");
 }

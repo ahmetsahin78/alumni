@@ -72,8 +72,9 @@ export class JobService {
   }
 
   static async getJobById(id: string) {
-    const job = await prisma.jobPosting.findUnique({
-      where: { id },
+    const numericId = Number(id);
+    const job = !Number.isInteger(numericId) ? null : await prisma.jobPosting.findUnique({
+      where: { id: numericId },
       include: {
         author: {
           select: {
@@ -114,7 +115,8 @@ export class JobService {
   }
 
   static async deleteJob(userId: string, role: Role, id: string) {
-    const job = await prisma.jobPosting.findUnique({ where: { id } });
+    const numericId = Number(id);
+    const job = !Number.isInteger(numericId) ? null : await prisma.jobPosting.findUnique({ where: { id: numericId } });
 
     if (!job) {
       const error: any = new Error("İş ilanı bulunamadı.");
@@ -128,7 +130,7 @@ export class JobService {
       throw error;
     }
 
-    await prisma.jobPosting.delete({ where: { id } });
+    await prisma.jobPosting.delete({ where: { id: numericId } });
     return { message: "İlan başarıyla silindi." };
   }
 }

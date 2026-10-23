@@ -11,6 +11,7 @@
 import { Request, Response } from "express";
 import { userModel } from "../models/User.model";
 import { UserViews } from "../views/user.views";
+import { JobPostingModel } from "../models/JobPosting.model";
 
 export class UserController {
   /**
@@ -90,7 +91,9 @@ export class UserController {
       return;
     }
 
-    const html = UserViews.renderDetail(user);
+    // Kullanıcının ilanları (DB erişilemezse boş liste)
+    const jobs = await JobPostingModel.findByAuthor(String(user.id)).catch(() => []);
+    const html = UserViews.renderDetail(user, jobs);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.status(200).send(html);
   }

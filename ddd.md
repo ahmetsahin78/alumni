@@ -21,6 +21,8 @@ erDiagram
     skills ||--o{ user_skills : "assigned to (1:N)"
     users ||--o{ mentorship_requests : "mentors / requests (1:N)"
     users ||--o{ job_postings : "publishes (1:N)"
+    job_postings ||--o{ applications : "receives (1:N)"
+    users ||--o{ applications : "applies (1:N)"
     users ||--o{ events : "organizes (1:N)"
     events ||--o{ event_rsvps : "has RSVPs (1:N)"
     users ||--o{ event_rsvps : "attends (1:N)"
@@ -113,7 +115,7 @@ erDiagram
     }
 
     job_postings {
-        string id PK "UUID / TEXT"
+        int id PK "SERIAL (AUTO_INCREMENT)"
         string authorId FK "NOT NULL -> users(id) ON DELETE CASCADE"
         string title "NOT NULL"
         string company "NOT NULL"
@@ -125,6 +127,16 @@ erDiagram
         string applicationUrl "NULLABLE"
         string salaryRange "NULLABLE"
         boolean isActive "DEFAULT true"
+        datetime createdAt "DEFAULT now()"
+        datetime updatedAt "NOT NULL"
+    }
+
+    applications {
+        int id PK "SERIAL (AUTO_INCREMENT)"
+        int jobId FK "NOT NULL -> job_postings(id) ON DELETE CASCADE"
+        string userId FK "NOT NULL -> users(id) ON DELETE CASCADE"
+        string status "ENUM: PENDING, REVIEWED, ACCEPTED, REJECTED"
+        string coverLetter "TEXT, NULLABLE"
         datetime createdAt "DEFAULT now()"
         datetime updatedAt "NOT NULL"
     }
@@ -301,8 +313,8 @@ Mezunların ve şirketlerin ağ içerisinde paylaştığı kariyer fırsatları.
 
 | Kolon | Tip | Kısıtlama | Açıklama |
 | :--- | :--- | :--- | :--- |
-| `id` | `INT` | `PRIMARY KEY, AUTO_INCREMENT` | İlan ID |
-| `authorId` | `INT` | `NOT NULL, FK -> users(id)` | İlanı yayınlayan mezun/yönetici |
+| `id` | `INT` | `PRIMARY KEY, SERIAL (AUTO_INCREMENT)` | İlan ID |
+| `authorId` | `TEXT (UUID)` | `NOT NULL, FK -> users(id) ON DELETE CASCADE, INDEX` | İlanı yayınlayan kullanıcı |
 | `title` | `VARCHAR(255)` | `NOT NULL` | İlan başlığı |
 | `company` | `VARCHAR(255)` | `NOT NULL` | Şirket adı |
 | `location` | `VARCHAR(150)` | `NOT NULL` | Konum (Hibrit, Uzaktan, vb.) |
@@ -310,11 +322,46 @@ Mezunların ve şirketlerin ağ içerisinde paylaştığı kariyer fırsatları.
 | `industry` | `VARCHAR(150)` | `NULLABLE, INDEX` | Sektör filtresi |
 | `description` | `TEXT` | `NOT NULL` | İş tanımı |
 | `requirements` | `TEXT` | `NULLABLE` | Aranan nitelikler |
-| `applicationUrl`| `VARCHAR(500)` | `NULLABLE` | Başvuru linki |
+| `applicationUrl`| `VARCHAR(500)` | `NULLABLE` | Harici başvuru linki |
 | `salaryRange` | `VARCHAR(100)` | `NULLABLE` | Maaş skalası (opsiyonel) |
 | `isActive` | `BOOLEAN` | `DEFAULT true` | İlan yayında mı? |
 | `createdAt` | `TIMESTAMP` | `DEFAULT CURRENT_TIMESTAMP` | İlan tarihi |
 | `updatedAt` | `TIMESTAMP` | `NOT NULL` | Güncelleme tarihi |
+
+**İlişkiler:** `users 1 — N job_postings` (bir kullanıcı birçok ilan yayınlar, her ilanın tek yazarı vardır). `job_postings 1 — N applications`.
+
+---
+
+### 7b. `applications` (İlan Başvuruları)
+Bir kullanıcının bir iş ilanına yaptığı başvuru. `users` ile `job_postings` arasındaki **N:M** ilişkiyi kuran ara (junction) tablodur.
+
+| Kolon | Tip | Kısıtlama | Açıklama |
+| :--- | :--- | :--- | :--- |
+| `id` | `INT` | `PRIMARY KEY, SERIAL (AUTO_INCREMENT)` | Başvuru ID |
+| `jobId` | `INT` | `NOT NULL, FK -> job_postings(id) ON DELETE CASCADE` | Başvurulan ilan |
+| `userId` | `TEXT (UUID)` | `NOT NULL, FK -> users(id) ON DELETE CASCADE, INDEX` | Başvuran kullanıcı |
+| `status` | `ENUM` | `DEFAULT 'PENDING'` | `PENDING`, `REVIEWED`, `ACCEPTED`, `REJECTED` |
+| `coverLetter` | `TEXT` | `NULLABLE` | Ön yazı |
+| `createdAt` | `TIMESTAMP` | `DEFAULT CURRENT_TIMESTAMP` | Başvuru tarihi |
+| `updatedAt` | `TIMESTAMP` | `NOT NULL` | Güncelleme tarihi |
+
+**Unique pair:** `UNIQUE (jobId, userId)` (`applications_jobId_userId_key`). Aynı kullanıcı aynı ilana yalnızca **bir kez** başvurabilir. İkinci deneme veritabanında reddedilir ve API **`409 Conflict`** döner.
+
+**İlişkiler:**
+- `job_postings 1 — N applications`: bir ilanın birçok başvurusu olur.
+- `users 1 — N applications`: bir kullanıcı birçok ilana başvurur.
+
+### 🗑️ Delete Rule (job_postings & applications)
+
+| Silinen kayıt | Sonuç | Kısıt |
+| :--- | :--- | :--- |
+| Bir **kullanıcı** (`users`) | Yayınladığı tüm ilanlar silinir, bu ilanlara gelen başvurular da silinir; kullanıcının başka ilanlara yaptığı başvurular da silinir. | `job_postings.authorId` ve `applications.userId` → `ON DELETE CASCADE` |
+| Bir **ilan** (`job_postings`) | O ilana yapılmış tüm başvurular silinir. Başvuran kullanıcılar etkilenmez. | `applications.jobId` → `ON DELETE CASCADE` |
+| Bir **başvuru** (`applications`) | Sadece başvuru silinir. İlan ve kullanıcı etkilenmez. | — |
+
+Gerekçe: yazarı olmayan bir ilan ya da ilanı/kullanıcısı olmayan bir başvuru anlamsızdır, bu yüzden yetim (orphan) kayıt bırakılmaz. Kural veritabanı seviyesinde FK ile uygulanır, uygulama kodunda ayrıca silme yapılmaz.
+
+**Seed sırası:** Seed, tabloları çocuktan ebeveyne doğru boşaltır (`applications` → `event_rsvps` → `events` → `job_postings` → … → `users`) ve INT id sayaçlarını (`applications`, `job_postings`, `announcements`, `alumni_records`) `ALTER SEQUENCE … RESTART WITH 1` ile sıfırlar. Böylece her seed'den sonra ilk ilan `id = 1` olur.
 
 ---
 
@@ -381,11 +428,12 @@ Dersin 3. haftasındaki slayt gereksinimlerini karşılayan hızlı mezun listel
 ## 🔒 Güvenlik, İndeksleme ve Bütünlük Kuralları
 
 1. **Cascade Silme (ON DELETE CASCADE):**
-   - Bir kullanıcı (`users`) silindiğinde ona ait `profiles`, `academic_histories`, `work_experiences`, `user_skills` ve `event_rsvps` kayıtları veritabanı seviyesinde otomatik olarak temizlenir (Yetim kayıt oluşumu engellenir).
+   - Bir kullanıcı (`users`) silindiğinde ona ait `profiles`, `academic_histories`, `work_experiences`, `user_skills`, `event_rsvps`, `job_postings` ve `applications` kayıtları veritabanı seviyesinde otomatik olarak temizlenir (Yetim kayıt oluşumu engellenir).
+   - Bir ilan (`job_postings`) silindiğinde ona yapılan `applications` kayıtları da silinir (bkz. 7b Delete Rule).
 2. **Performans İndeksleri:**
    - Hızlı arama ve filtreleme için `graduationYear`, `department`, `industry`, `company`, `category` ve `priority` alanlarına b-tree indeksleri tanımlanmıştır.
 3. **Benzersizlik (Unique Constraints):**
-   - Kullanıcı e-postaları (`users.email`), yetenek isimleri (`skills.name`), kullanıcı-yetenek çiftleri (`user_skills(userId, skillId)`) ve etkinlik katılımları (`event_rsvps(eventId, userId)`) benzersizdir.
+   - Kullanıcı e-postaları (`users.email`), yetenek isimleri (`skills.name`), kullanıcı-yetenek çiftleri (`user_skills(userId, skillId)`), etkinlik katılımları (`event_rsvps(eventId, userId)`) ve ilan başvuruları (`applications(jobId, userId)`) benzersizdir.
 
 ---
 

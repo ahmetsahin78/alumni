@@ -10,6 +10,7 @@
 
 import { Router } from "express";
 import { ApiUserController } from "../controllers/ApiUserController";
+import { ApiJobController } from "../controllers/ApiJobController";
 
 const router = Router();
 
@@ -19,7 +20,16 @@ router.get("/", ApiUserController.getUsers);
 // POST /api/users -> Yeni kullanıcı ekle (201 Created)
 router.post("/", ApiUserController.createUser);
 
-// GET /api/users/:id -> ID'ye göre tekil kullanıcı getir
+// POST /api/users/:id/jobs -> Kullanıcı adına iş ilanı oluştur (201, bilinmeyen kullanıcı 404)
+router.post("/:id/jobs", ApiJobController.createForUser);
+
+// GET /api/users/:id/jobs -> Kullanıcının iş ilanları (bilinmeyen kullanıcı 404)
+router.get("/:id/jobs", ApiJobController.listForUser);
+
+// GET /api/users/:id/applications -> Kullanıcının yaptığı başvurular
+router.get("/:id/applications", ApiJobController.listApplicationsOfUser);
+
+// GET /api/users/:id -> ID'ye göre tekil kullanıcı getir (ilanları "jobs" alanında)
 router.get("/:id", ApiUserController.getUserById);
 
 // PUT /api/users/:id -> Bütünsel güncelleme
