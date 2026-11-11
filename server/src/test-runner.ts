@@ -5,6 +5,10 @@ import { alumniStore } from "./storage/inMemoryStore";
 import { userModel } from "./models/User.model";
 import { announcementModel } from "./models/Announcement.model";
 import prisma from "./prisma";
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { errorHandler } from "./middlewares/errorHandler";
 
 async function runCourseAssignmentTests() {
   console.log("\n============================================================");
@@ -440,6 +444,72 @@ async function runCourseAssignmentTests() {
     assert(sumRes.status === 200, "GET /sum/15/27 returns HTTP 200");
     const sumText = await sumRes.text();
     assert(sumText === "42", `GET /sum/15/27 response is '42' (got '${sumText}')`);
+
+    // -------------------------------------------------------------
+    // Test 9: Middlewares (validation, 404 guardian, 5xx guardian)
+    // -------------------------------------------------------------
+    console.log("\n--- 9. Middleware Tests (invalid requests) ---");
+    const post = (body: string) => ({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    const anyUser = "00000000-0000-0000-0000-000000000000";
+
+    // 9.1 Validation: title & company zorunlu
+    const vEmpty = await fetch(`${baseUrl}/api/users/${anyUser}/jobs`, post("{}"));
+    const vEmptyBody: any = await vEmpty.json();
+    assert(vEmpty.status === 400, "Empty job body returns 400 (validation runs before controller)");
+    assert(vEmptyBody.error === "validation failed", "400 body has error: 'validation failed'");
+    assert(Boolean(vEmptyBody.fields?.title && vEmptyBody.fields?.company), "400 body lists title and company in fields");
+    assert(!vEmptyBody.fields?.location && !vEmptyBody.fields?.description, "location/description are optional");
+
+    // 9.2 Validation: title en fazla 120 karakter
+    const vLong = await fetch(
+      `${baseUrl}/api/users/${anyUser}/jobs`,
+      post(JSON.stringify({ title: "x".repeat(121), company: "ACME" }))
+    );
+    const vLongBody: any = await vLong.json();
+    assert(vLong.status === 400 && /120/.test(vLongBody.fields?.title ?? ""), "Title longer than 120 chars returns 400");
+
+    // 9.3 Bozuk JSON -> 400 (500 değil)
+    const badJson = await fetch(`${baseUrl}/api/users/${anyUser}/jobs`, post("{ title: "));
+    const badJsonBody: any = await badJson.json();
+    assert(badJson.status === 400 && badJsonBody.error === "invalid JSON", "Malformed JSON body returns 400 invalid JSON");
+
+    // 9.4 404 Guardian: API -> JSON + reason
+    const nfApi = await fetch(`${baseUrl}/api/does-not-exist`);
+    const nfApiBody: any = await nfApi.json();
+    assert(nfApi.status === 404, "Unknown API route returns 404");
+    assert(nfApiBody.reason === "No route matches GET /api/does-not-exist", "404 JSON includes a reason");
+
+    // 9.5 404 Guardian: tarayıcı -> /404 sayfasına redirect
+    const nfPage = await fetch(`${baseUrl}/no/such/page`, { headers: { Accept: "text/html" }, redirect: "manual" });
+    assert(nfPage.status === 302, "Unknown page from browser redirects (302)");
+    assert(
+      nfPage.headers.get("location") === "/404?path=%2Fno%2Fsuch%2Fpage",
+      `Redirect target is /404?path=... (got ${nfPage.headers.get("location")})`
+    );
+    const page404 = await fetch(`${baseUrl}/404`);
+    assert(page404.status === 404 && (await page404.text()).includes("Sayfa bulunamadı"), "GET /404 serves the generic 404 page");
+
+    // 9.6 5xx Guardian: stack istemciye gitmez, error log dosyasına yazılır
+    const tmpLog = path.join(os.tmpdir(), `alumni-error-${Date.now()}.log`);
+    process.env.ERROR_LOG_FILE = tmpLog;
+    let sentStatus = 0;
+    let sentBody: any = null;
+    const fakeRes: any = {
+      headersSent: false,
+      status(code: number) { sentStatus = code; return this; },
+      json(body: any) { sentBody = body; return this; },
+    };
+    errorHandler(new Error("database exploded"), { method: "GET", originalUrl: "/api/boom" } as any, fakeRes, () => {});
+    assert(sentStatus === 500 && sentBody?.error === "internal server error", "Unhandled error returns 500 internal server error");
+    assert(!JSON.stringify(sentBody).includes("database exploded"), "500 response does not leak message/stack");
+    const logged = fs.existsSync(tmpLog) ? fs.readFileSync(tmpLog, "utf8") : "";
+    assert(logged.includes(sentBody?.errorId) && logged.includes("database exploded"), "5xx error written to error log with errorId + stack");
+    fs.rmSync(tmpLog, { force: true });
+    delete process.env.ERROR_LOG_FILE;
 
     console.log("\n============================================================");
     console.log(`📊 FINAL RESULTS: ${passed} PASSED, ${failed} FAILED`);

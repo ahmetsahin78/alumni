@@ -18,7 +18,7 @@ export interface UserJobPosting {
   id: number;
   title: string;
   company: string;
-  location: string;
+  location: string | null;
   type: string;
   _count?: { applications: number };
 }
@@ -155,7 +155,7 @@ export class UserViews {
               <td>#${job.id}</td>
               <td style="font-weight: 600;">${esc(job.title)}</td>
               <td>${esc(job.company)}</td>
-              <td>${esc(job.location)}</td>
+              <td>${esc(job.location ?? "—")}</td>
               <td><span class="badge badge-neutral">${job.type}</span></td>
               <td>${job._count?.applications ?? 0}</td>
               <td><a href="/api/jobs/${job.id}/applications" class="btn btn-secondary btn-sm">Başvuranlar (JSON)</a></td>

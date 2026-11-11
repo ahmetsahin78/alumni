@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>404 — Sayfa Bulunamadı</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0b0f19; color: #fff; padding: 3rem 1rem; text-align: center; }
+    .code { font-size: 5rem; font-weight: 800; color: #60a5fa; margin: 0; }
+    h1 { margin: .5rem 0 1rem; }
+    p { color: #94a3b8; max-width: 600px; margin: 0 auto 1.5rem auto; line-height: 1.6; }
+    code { background: #1e293b; color: #e2e8f0; padding: .15rem .45rem; border-radius: 4px; word-break: break-all; }
+    nav a { color: #3b82f6; text-decoration: none; font-weight: bold; margin: 0 .75rem; }
+  </style>
+</head>
+<body>
+  <p class="code">404</p>
+  <h1>Sayfa bulunamadı</h1>
+  <p>İstediğiniz adres bu sunucuda tanımlı değil: <code id="path">bilinmiyor</code></p>
+  <nav>
+    <a href="/users">Kullanıcılar</a>
+    <a href="/announcements">Duyurular</a>
+    <a href="/api/swagger">API Dokümanı</a>
+    <a href="/about">Hakkında</a>
+  </nav>
+  <script>
+    // textContent kullanılır: URL'deki değer HTML olarak yorumlanmaz (XSS yok)
+    var p = new URLSearchParams(location.search).get("path");
+    if (p) document.getElementById("path").textContent = p;
+  </script>
+</body>
+</html>

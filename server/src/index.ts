@@ -2,7 +2,6 @@ import express, { Request, Response } from "express";
 import path from "path";
 import cors from "cors";
 import helmet from "helmet";
-import morgan from "morgan";
 import dotenv from "dotenv";
 import swaggerUi from "swagger-ui-express";
 import apiRoutes from "./routes";
@@ -10,6 +9,9 @@ import { swaggerSpec } from "./docs/swaggerSpec";
 import utilityRoutes from "./routes/utility.routes";
 import userRoutes from "./routes/user.routes";
 import announcementRoutes from "./routes/announcement.routes";
+import { requestLogger } from "./middlewares/logger";
+import { notFound } from "./middlewares/notFound";
+import { errorHandler } from "./middlewares/errorHandler";
 
 // Load environment variables
 dotenv.config();
@@ -25,7 +27,8 @@ app.use(
   })
 );
 app.use(cors());
-app.use(morgan(process.env.NODE_ENV === "development" ? "dev" : "combined"));
+// 1. Logger: her isteği terminale yazar (time method route status duration)
+app.use(requestLogger);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // 1. GET / -> "ok" (Ders içi temel rota gereksinimi)
@@ -77,21 +80,16 @@ app.use("/announcements", announcementRoutes);
 // Main REST API Endpoints (/api/health, /api/alumni, /api/users, /api/announcements)
 app.use("/api", apiRoutes);
 
-// Default 404 Handler for undefined routes
-app.use((req: Request, res: Response) => {
-  res.status(404).json({
-    error: `Endpoint '${req.method} ${req.originalUrl}' bulunamadı.`,
-    availableDocs: "/api/swagger",
-  });
+// Generic 404 page (tarayıcıdan gelen geçersiz istekler buraya yönlendirilir)
+app.get("/404", (req: Request, res: Response) => {
+  res.status(404).sendFile(path.join(publicDir, "404.html"));
 });
 
-// Global Error Handler
-app.use((err: any, req: Request, res: Response, next: any) => {
-  console.error("Unhandled server error:", err);
-  res.status(err.statusCode || err.status || 500).json({
-    error: err.message || "Internal Server Error",
-  });
-});
+// 404 Guardian: hiçbir rotanın karşılamadığı istekler (JSON reason veya /404 redirect)
+app.use(notFound);
+
+// 5xx Guardian / Global Error Handler: next(err) ile gelen her hata (logs/error.log)
+app.use(errorHandler);
 
 // Start Server
 if (process.env.NODE_ENV !== "test") {

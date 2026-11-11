@@ -37,12 +37,7 @@ export class ApiJobController {
         return;
       }
 
-      const errors = JobPostingModel.validate(req.body);
-      if (errors.length > 0) {
-        res.status(400).json({ error: "Geçersiz ilan verisi.", details: errors });
-        return;
-      }
-
+      // Body doğrulaması route seviyesinde validateJobPosting middleware'inde yapılır.
       const job = await JobPostingModel.createForAuthor(userId, req.body);
       res.status(201).json(job);
     } catch (err) {

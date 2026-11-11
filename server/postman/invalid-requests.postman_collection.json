@@ -1,0 +1,141 @@
+{
+  "info": {
+    "name": "Alumni Tracking — Invalid Requests",
+    "description": "Middleware'leri denemek için geçersiz istekler (validation, 404 guardian, bozuk JSON).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5001"
+    },
+    {
+      "key": "userId",
+      "value": "<GET /api/users çıktısından bir id>"
+    }
+  ],
+  "item": [
+    {
+      "name": "400 — boş body (title & company zorunlu)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/users/{{userId}}/jobs",
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        }
+      }
+    },
+    {
+      "name": "400 — title 120 karakterden uzun",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/users/{{userId}}/jobs",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\n  \"company\": \"ACME\"\n}"
+        }
+      }
+    },
+    {
+      "name": "400 — title boş string",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/users/{{userId}}/jobs",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"   \",\n  \"company\": \"ACME\"\n}"
+        }
+      }
+    },
+    {
+      "name": "400 — bozuk JSON",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/users/{{userId}}/jobs",
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"title\": "
+        }
+      }
+    },
+    {
+      "name": "404 — olmayan kullanıcı",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/users/00000000-0000-0000-0000-000000000000/jobs",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Stajyer\",\n  \"company\": \"ACME\"\n}"
+        }
+      }
+    },
+    {
+      "name": "404 — tanımsız API rotası (reason)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/olmayan-rota"
+      }
+    },
+    {
+      "name": "302 — tarayıcı gibi tanımsız sayfa (/404'e redirect)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "text/html"
+          }
+        ],
+        "url": "{{baseUrl}}/olmayan-sayfa"
+      }
+    },
+    {
+      "name": "201 — geçerli ilan (sadece zorunlu alanlar)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/users/{{userId}}/jobs",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Stajyer\",\n  \"company\": \"ACME\"\n}"
+        }
+      }
+    }
+  ]
+}

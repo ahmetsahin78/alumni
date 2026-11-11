@@ -326,12 +326,12 @@ export const swaggerSpec = {
             "application/json": {
               schema: {
                 type: "object",
-                required: ["title", "company", "location", "description"],
+                required: ["title", "company"],
                 properties: {
-                  title: { type: "string", example: "Junior Backend Developer" },
+                  title: { type: "string", maxLength: 120, example: "Junior Backend Developer" },
                   company: { type: "string", example: "Trendyol" },
-                  location: { type: "string", example: "İstanbul (Hibrit)" },
-                  description: { type: "string", example: "Node.js bilen mezun arıyoruz." },
+                  location: { type: "string", nullable: true, description: "Opsiyonel (şehir)", example: "İstanbul (Hibrit)" },
+                  description: { type: "string", nullable: true, description: "Opsiyonel", example: "Node.js bilen mezun arıyoruz." },
                   type: { type: "string", enum: ["FULL_TIME", "PART_TIME", "INTERNSHIP", "REMOTE", "CONTRACT"] },
                   industry: { type: "string" },
                 },
@@ -341,7 +341,7 @@ export const swaggerSpec = {
         },
         responses: {
           "201": { description: "İlan oluşturuldu" },
-          "400": { description: "Eksik/geçersiz alan" },
+          "400": { description: 'validateJobPosting: { "error": "validation failed", "fields": { "title": "title is required" } }' },
           "404": { description: "Kullanıcı bulunamadı" },
         },
       },

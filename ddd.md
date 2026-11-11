@@ -315,12 +315,12 @@ Mezunların ve şirketlerin ağ içerisinde paylaştığı kariyer fırsatları.
 | :--- | :--- | :--- | :--- |
 | `id` | `INT` | `PRIMARY KEY, SERIAL (AUTO_INCREMENT)` | İlan ID |
 | `authorId` | `TEXT (UUID)` | `NOT NULL, FK -> users(id) ON DELETE CASCADE, INDEX` | İlanı yayınlayan kullanıcı |
-| `title` | `VARCHAR(255)` | `NOT NULL` | İlan başlığı |
+| `title` | `VARCHAR(120)` | `NOT NULL` | İlan başlığı (en fazla 120 karakter) |
 | `company` | `VARCHAR(255)` | `NOT NULL` | Şirket adı |
-| `location` | `VARCHAR(150)` | `NOT NULL` | Konum (Hibrit, Uzaktan, vb.) |
+| `location` | `TEXT` | `NULLABLE` | Şehir / konum (Hibrit, Uzaktan, vb.) — opsiyonel |
 | `type` | `ENUM` | `DEFAULT 'FULL_TIME'` | `FULL_TIME`, `PART_TIME`, `INTERNSHIP`, `REMOTE`, `CONTRACT` |
 | `industry` | `VARCHAR(150)` | `NULLABLE, INDEX` | Sektör filtresi |
-| `description` | `TEXT` | `NOT NULL` | İş tanımı |
+| `description` | `TEXT` | `NULLABLE` | İş tanımı — opsiyonel |
 | `requirements` | `TEXT` | `NULLABLE` | Aranan nitelikler |
 | `applicationUrl`| `VARCHAR(500)` | `NULLABLE` | Harici başvuru linki |
 | `salaryRange` | `VARCHAR(100)` | `NULLABLE` | Maaş skalası (opsiyonel) |
@@ -329,6 +329,25 @@ Mezunların ve şirketlerin ağ içerisinde paylaştığı kariyer fırsatları.
 | `updatedAt` | `TIMESTAMP` | `NOT NULL` | Güncelleme tarihi |
 
 **İlişkiler:** `users 1 — N job_postings` (bir kullanıcı birçok ilan yayınlar, her ilanın tek yazarı vardır). `job_postings 1 — N applications`.
+
+#### 📏 Kurallar (JobPosting Domain Rules)
+
+Bir iş ilanı oluşturulurken (`POST /api/users/:id/jobs`, `POST /api/jobs`) body aşağıdaki kurallara uymak zorundadır:
+
+| Alan | Kural | İhlal edilirse (`fields` içindeki mesaj) |
+| :--- | :--- | :--- |
+| `title` | **Zorunlu**, boş olamaz, **en fazla 120 karakter** | `title is required` / `title must be at most 120 characters` |
+| `company` | **Zorunlu**, boş olamaz | `company is required` |
+| `location` (şehir) | Opsiyonel; verilirse string | `location must be a string` |
+| `description` | Opsiyonel; verilirse string | `description must be a string` |
+| `type` | Opsiyonel; `FULL_TIME`, `PART_TIME`, `INTERNSHIP`, `REMOTE`, `CONTRACT` | `type must be one of: ...` |
+
+**Nerede uygulanır?**
+1. **Uygulama katmanı:** `validateJobPosting` middleware'i (`server/src/middlewares/validateJobPosting.ts`) kuralları `JobPostingModel.validate` üzerinden kontrol eder. Kural ihlalinde controller hiç çalışmaz, istemciye tek tip yanıt döner:
+   ```json
+   400 { "error": "validation failed", "fields": { "title": "title is required", "company": "company is required" } }
+   ```
+2. **Veritabanı katmanı:** `title VARCHAR(120) NOT NULL`, `company NOT NULL`; `location` ve `description` NULL olabilir (migration `20261112100000_job_posting_rules`). Uygulama kontrolü atlansa bile DB kuralı korur.
 
 ---
 

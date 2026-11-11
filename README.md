@@ -74,10 +74,14 @@ alumni-tracking-system/
     │   ├── seed.ts                 # Tabloları doğru sırayla boşaltır, id sayaçlarını sıfırlar, örnek veri ekler
     │   └── migrations/
     │       ├── 20261014_init/                          # İlk şema
-    │       └── 20261023160000_job_postings_applications/ # job_postings INT id + applications tablosu
-    ├── public/                     # Statik sayfalar (index.html, about.html)
+    │       ├── 20261023160000_job_postings_applications/ # job_postings INT id + applications tablosu
+    │       └── 20261112100000_job_posting_rules/          # title VARCHAR(120), location/description opsiyonel
+    ├── logs/                       # error.log (5xx hataları; git'e eklenmez, ilk hatada oluşur)
+    ├── postman/                    # Geçersiz istek koleksiyonu (Postman'e import edilir)
+    ├── public/                     # Statik sayfalar (index.html, about.html, 404.html)
     └── src/
         ├── index.ts                # Express uygulaması ve global middleware'ler
+        ├── middlewares/            # logger, validateJobPosting, notFound (404), errorHandler (5xx), auth
         ├── prisma.ts               # Paylaşılan PrismaClient
         ├── test-runner.ts          # Uçtan uca testler (npm test)
         ├── models/                 # [MODEL] User, Announcement, JobPosting, Application
@@ -117,7 +121,7 @@ alumni-tracking-system/
 
 | HTTP Metodu | Rota / URL | Başarılı | Hata durumları |
 | :--- | :--- | :--- | :--- |
-| **POST** | `/api/users/:id/jobs` | `201` oluşturulan ilan | `400` eksik alan (`title`, `company`, `location`, `description`), `404` kullanıcı yok |
+| **POST** | `/api/users/:id/jobs` | `201` oluşturulan ilan | `400 validation failed` (`title` zorunlu ve ≤120 karakter, `company` zorunlu; `location`/`description` opsiyonel), `404` kullanıcı yok |
 | **GET** | `/api/users/:id/jobs` | `200` kullanıcının ilanları | `404` kullanıcı yok |
 | **GET** | `/api/users/:id` | `200` kullanıcı + `jobs` dizisi | `404` kullanıcı yok |
 | **GET** | `/users/:id` | HTML profil sayfası + ilan tablosu | `404` |
@@ -151,6 +155,47 @@ Invoke-RestMethod -Method Post -Uri http://localhost:5001/api/jobs/1/application
   -ContentType "application/json" -Body '{"userId":"<USER_ID>"}'
 ```
 
+### 1c. Middleware Hattı (Logger, Validation, 404 & 5xx Guardian)
+
+Her istek aynı sırayla bu "hat"tan geçer; loglama, doğrulama ve hata yakalama artık her controller'da tekrar edilmez:
+
+```plaintext
+istek ─► logger ─► express.json ─► rota ─► validateJobPosting ─► controller ─► yanıt
+                        │                         │                    │
+                        │ bozuk JSON              │ kural ihlali       │ next(err)
+                        ▼                         ▼                    ▼
+               400 invalid JSON         400 validation failed    errorHandler (5xx -> logs/error.log)
+
+hiçbir rota eşleşmezse ─► notFound (404 Guardian)
+```
+
+| Middleware | Dosya | Ne yapar? |
+| :--- | :--- | :--- |
+| **Logger** | `server/src/middlewares/logger.ts` | Her isteği terminale yazar: `time  method  route  status  duration` |
+| **Validation** | `server/src/middlewares/validateJobPosting.ts` | İlan body'sini [ddd.md](./ddd.md) kurallarına göre kontrol eder → `400 { error: "validation failed", fields }` |
+| **404 Guardian** | `server/src/middlewares/notFound.ts` | Tanımsız rota: API/Postman → `404 { error: "not found", reason }`; tarayıcı → `/404` sayfasına **redirect** |
+| **5xx Guardian** | `server/src/middlewares/errorHandler.ts` | Beklenmeyen hata → `500 { error: "internal server error", errorId }`; stack trace istemciye gitmez, `server/logs/error.log` dosyasına yazılır |
+
+Terminal log örneği:
+
+```plaintext
+10:20:30  POST    /api/users/1/jobs                 201   18 ms
+10:20:31  POST    /api/users/1/jobs                 400   3 ms
+10:20:35  GET     /api/nope                         404   1 ms
+10:20:40  GET     /foo                              302   1 ms
+```
+
+**Geçersiz istekleri Postman'de deneme:** `server/postman/invalid-requests.postman_collection.json` dosyasını Postman → *Import* ile açın, `baseUrl` ve `userId` değişkenlerini ayarlayın (`userId` için `GET /api/users` çıktısından bir id alın) ve istekleri tek tek gönderin.
+
+| Geçersiz istek | Beklenen yanıt |
+| :--- | :--- |
+| `POST /api/users/<id>/jobs` body `{}` | `400 { "error": "validation failed", "fields": { "title": ..., "company": ... } }` |
+| `POST /api/users/<id>/jobs` title 121 karakter | `400` → `fields.title = "title must be at most 120 characters"` |
+| `POST /api/users/<id>/jobs` body `{ title: ` (bozuk JSON) | `400 { "error": "invalid JSON" }` |
+| `POST /api/users/<olmayan-id>/jobs` geçerli body | `404` kullanıcı bulunamadı |
+| `GET /api/olmayan-rota` | `404 { "error": "not found", "reason": "No route matches GET /api/olmayan-rota" }` |
+| Tarayıcıda `http://localhost:5001/olmayan-sayfa` | `302` → `/404?path=/olmayan-sayfa` (genel 404 sayfası) |
+
 ### 2. Duyuru Modülü (Announcement Module - Ödev Görevleri)
 
 | HTTP Metodu | Rota / URL | Katman | Açıklama |
@@ -180,6 +225,7 @@ Invoke-RestMethod -Method Post -Uri http://localhost:5001/api/jobs/1/application
 | **GET** | `/api/swagger` (veya `/api-docs`) | Swagger UI Etkileşimli API Dokümantasyonu | HTML Arayüzü |
 | **GET** | `/api/swagger.json` | OpenAPI 3.0 Ham JSON Spesifikasyonu | JSON |
 | **GET** | `/api/health` | Sunucu sağlık durumu (Uptime, RAM, CPU) | JSON |
+| **GET** | `/404` | Genel 404 sayfası (tanımsız sayfalar buraya yönlendirilir) | HTML, `404` |
 
 ---
 
@@ -320,7 +366,7 @@ Sistem, çoklu konteyner mimarisini yönetmek ve veritabanı kalıcılığını 
 # 1. Konteynerleri inşa et ve başlat
 docker compose up --build -d
 
-# 2. Veritabanı tablolarını oluştur (Migration: init + job_postings_applications)
+# 2. Veritabanı tablolarını oluştur (Migration: init + job_postings_applications + job_posting_rules)
 docker compose exec server npx prisma migrate deploy
 
 # 3. Başlangıç verilerini (Seed) yükle

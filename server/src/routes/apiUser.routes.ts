@@ -11,6 +11,7 @@
 import { Router } from "express";
 import { ApiUserController } from "../controllers/ApiUserController";
 import { ApiJobController } from "../controllers/ApiJobController";
+import { validateJobPosting } from "../middlewares/validateJobPosting";
 
 const router = Router();
 
@@ -20,8 +21,9 @@ router.get("/", ApiUserController.getUsers);
 // POST /api/users -> Yeni kullanıcı ekle (201 Created)
 router.post("/", ApiUserController.createUser);
 
-// POST /api/users/:id/jobs -> Kullanıcı adına iş ilanı oluştur (201, bilinmeyen kullanıcı 404)
-router.post("/:id/jobs", ApiJobController.createForUser);
+// POST /api/users/:id/jobs -> Kullanıcı adına iş ilanı oluştur
+//   validateJobPosting (400 validation failed) -> controller (404 bilinmeyen kullanıcı / 201)
+router.post("/:id/jobs", validateJobPosting, ApiJobController.createForUser);
 
 // GET /api/users/:id/jobs -> Kullanıcının iş ilanları (bilinmeyen kullanıcı 404)
 router.get("/:id/jobs", ApiJobController.listForUser);

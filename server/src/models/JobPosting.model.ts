@@ -14,8 +14,8 @@ import prisma from "../prisma";
 export interface CreateJobInput {
   title: string;
   company: string;
-  location: string;
-  description: string;
+  location?: string;
+  description?: string;
   type?: JobType;
   industry?: string;
   requirements?: string;
@@ -24,18 +24,41 @@ export interface CreateJobInput {
 }
 
 const JOB_TYPES = Object.values(JobType) as string[];
+export const JOB_TITLE_MAX = 120;
 
 export class JobPostingModel {
-  /** Gelen body'yi doğrular; hata varsa mesaj listesi döner. */
-  public static validate(body: any): string[] {
-    const errors: string[] = [];
-    for (const field of ["title", "company", "location", "description"]) {
-      if (!body?.[field] || typeof body[field] !== "string" || !body[field].trim()) {
-        errors.push(`'${field}' alanı zorunludur.`);
+  /**
+   * Domain kuralları (ddd.md -> job_postings / Kurallar):
+   *   - title       : zorunlu, string, en fazla 120 karakter
+   *   - company     : zorunlu, string
+   *   - location    : opsiyonel (şehir), verilirse string
+   *   - description : opsiyonel, verilirse string
+   *   - type        : opsiyonel, JobType enum değerlerinden biri
+   * Hata yoksa boş obje döner; varsa { alan: "mesaj" }.
+   */
+  public static validate(body: any): Record<string, string> {
+    const errors: Record<string, string> = {};
+    const isBlank = (v: unknown) => typeof v !== "string" || !v.trim();
+
+    if (body?.title === undefined || body?.title === null || isBlank(body.title)) {
+      errors.title = "title is required";
+    } else if (body.title.trim().length > JOB_TITLE_MAX) {
+      errors.title = `title must be at most ${JOB_TITLE_MAX} characters`;
+    }
+
+    if (body?.company === undefined || body?.company === null || isBlank(body.company)) {
+      errors.company = "company is required";
+    }
+
+    for (const field of ["location", "description"]) {
+      const v = body?.[field];
+      if (v !== undefined && v !== null && typeof v !== "string") {
+        errors[field] = `${field} must be a string`;
       }
     }
+
     if (body?.type !== undefined && !JOB_TYPES.includes(body.type)) {
-      errors.push(`'type' şunlardan biri olmalıdır: ${JOB_TYPES.join(", ")}.`);
+      errors.type = `type must be one of: ${JOB_TYPES.join(", ")}`;
     }
     return errors;
   }
@@ -58,8 +81,8 @@ export class JobPostingModel {
       authorId,
       title: data.title.trim(),
       company: data.company.trim(),
-      location: data.location.trim(),
-      description: data.description.trim(),
+      location: data.location?.trim() || null,
+      description: data.description?.trim() || null,
       type: data.type ?? JobType.FULL_TIME,
       industry: data.industry,
       requirements: data.requirements,
